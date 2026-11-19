@@ -230,7 +230,7 @@ I am Harshil Srivastav, the owner of C02. Apply the Shared Antigravity instructi
 
 **Commit message** `docs(scope): baseline the SRS and curation cases`
 
-- [ ] Pending · Actual date (IST) — · Evidence — <!-- C03-status -->
+- [x] Done · Actual date (IST) 19 Nov 2026 · Evidence: Tracked condensed Word SRS (FocusList_SRS_Condensed.docx v1.1, 41,342 chars) and project brief (Project_1_YouTube_MCP.pdf, 2 pages) verified with automated parser checks. Authored docs/curation-walkthrough.md defining seven curation acceptance scenarios (CW-01–CW-07) covering the two-hour/20-minute recursion baseline, decline, parameter validation, infeasible solver fallback, edit invalidation, partial write recovery/resume, and approved undo. Linked scenarios to C02 acceptance cases (ST-FR5, ST-FR7, SKE-SK2, SEC-APPROVAL, UT-SOLVER, NEG-CONSTRAINT). TBD-1 kept open pending course staff publication. Ayush verified with team review. <!-- C03-status -->
 
 **Implementation**
 
