@@ -1,0 +1,52 @@
+# Python environments and tooling
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+.coverage
+.coverage.*
+htmlcov/
+build/
+dist/
+*.egg-info/
+
+# Local configuration, OAuth credentials and keys
+.env
+.env.*
+!.env.example
+config.local.*
+focuslist.local.*
+/secrets/
+/credentials/
+client_secret*.json
+oauth_client*.json
+oauth-token*.json
+oauth_token*.json
+token.json
+tokens.json
+*.pem
+*.key
+*.p12
+
+# Local databases, logs and recordings
+*.db
+*.db-*
+*.sqlite
+*.sqlite-*
+*.sqlite3
+*.sqlite3-*
+*.log
+/.focuslist/
+/recordings/
+/raw-recordings/
+/tests/fixtures/raw/
+/tmp/
+
+# Working copies and OS metadata
+/~$*
+Thumbs.db
+.DS_Store
