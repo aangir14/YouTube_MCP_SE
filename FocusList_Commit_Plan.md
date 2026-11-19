@@ -206,7 +206,7 @@ I am Aangir Doshi, the owner of C01. Apply the Shared Antigravity instructions. 
 
 **Commit message** `docs(requirements): map brief to acceptance checks`
 
-- [ ] Pending · Actual date (IST) — · Evidence — <!-- C02-status -->
+- [x] Complete · Actual date (IST) 19 Nov 2026 · Evidence: [Traceability matrix](docs/requirements-traceability.md) and [acceptance cases](docs/testing/acceptance-cases.md) verified locally (42 mappings, 41 Given/When/Then cases, 118 valid case links). Harshil reviewed the documentation assignment. No product implementation tests were run because C02 defines specifications; their execution remains tracked against the implementation commits. <!-- C02-status -->
 
 **Implementation**
 
