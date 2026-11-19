@@ -10,7 +10,7 @@ Use these Given/When/Then cases to implement and report the planned tests in the
 - For live-read eligibility, account authorisation and playlist writes, distinguish the permitted preflight reads from the mutations. Run through the actual registered MCP tools where the case names the scripted client. Use direct unit/integration tests only for the layers named by the case.
 - Evidence for each executed check belongs in this folder. Record test ID, command or manual action, mode, result and linked PR. The twelve ST-FR IDs and six SKE-SK IDs match the condensed SRS traceability section.
 
-[Condensed SRS](../../FocusList_SRS_Condensed.docx) · [Course project statement](../../Project_1_YouTube_MCP.pdf)
+[Condensed SRS](../../FocusList_SRS_Condensed.docx) · [Course project statement](../../Project_1_YouTube_MCP.pdf) · [Curation Walkthrough](../curation-walkthrough.md)
 
 ## Course functionality and workflow
 

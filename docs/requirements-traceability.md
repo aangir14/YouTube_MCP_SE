@@ -9,6 +9,7 @@ After implementation, replace each pending cell with the actual link. Record tes
 - [Condensed SRS](../FocusList_SRS_Condensed.docx)
 - [Course project statement](../Project_1_YouTube_MCP.pdf)
 - [Commit plan and owners](../FocusList_Commit_Plan.md#team-member-timeline)
+- [Curation Walkthrough](curation-walkthrough.md)
 
 | Scope | Criterion | Brief § | SRS § or appendix | Delivery owner and commit | Planned test IDs | Issue | PR | Skill | Supporting note |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
