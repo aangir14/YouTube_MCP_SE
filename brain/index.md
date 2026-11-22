@@ -13,12 +13,22 @@ This master index catalogs all distilled research notes, architectural decision 
 | **OAuth 2.0 Lifecycle, Safe Credential Storage, and Least Privilege** | [`resources/oauth-lifecycle-and-safe-storage.md`](resources/oauth-lifecycle-and-safe-storage.md) | Aangir Doshi | 2026-11-19 | Research Note | Active | FR-9.1–9.9, COM-1–4, NFR-SEC, TBD-6, TBD-7 | [`SEC-OAUTH`](../docs/testing/acceptance-cases.md#sec-oauth), [`SEC-SECRETS`](../docs/testing/acceptance-cases.md#sec-secrets), [`NEG-AUTH`](../docs/testing/acceptance-cases.md#neg-auth), [`ST-FR9`](../docs/testing/acceptance-cases.md#st-fr9) |
 | **Synthetic Fixture Provider, Fault Injection, and CI Isolation** | [`resources/fixture-provider-and-ci-isolation.md`](resources/fixture-provider-and-ci-isolation.md) | Aangir Doshi | 2026-11-19 | Research Note | Active | FR-11.1–11.3, TQ-1–6, NFR-SEC, COM-5–6 | [`CI-FIXTURE`](../docs/testing/acceptance-cases.md#ci-fixture), [`CI-LIVE`](../docs/testing/acceptance-cases.md#ci-live), [`IT-PROVIDER`](../docs/testing/acceptance-cases.md#it-provider), [`NEG-UPSTREAM`](../docs/testing/acceptance-cases.md#neg-upstream) |
 | **Project Licensing Evaluation, Third-Party Compliance, and TBD-5 Tracking** | [`resources/licensing-and-distribution.md`](resources/licensing-and-distribution.md) | Aangir Doshi | 2026-11-19 | Decision Record | Draft | L-1 to L-6, TBD-5 | [`FocusList_Commit_Plan.md#7`](../FocusList_Commit_Plan.md#7-decisions-carried-forward-from-appendix-c) |
+| **Candidate Retrieval and TF-IDF** | [Note](resources/candidate-retrieval-and-tfidf.md) | Harshil Srivastav | 2026-11-22 | Research Note | Active | FR-1–FR-3, FR-6, TQ-1, TQ-3, TQ-4, TBD-4 | [ST-FR1](../docs/testing/acceptance-cases.md#st-fr1), [ST-FR2](../docs/testing/acceptance-cases.md#st-fr2), [ST-FR3](../docs/testing/acceptance-cases.md#st-fr3), [NEG-INPUT](../docs/testing/acceptance-cases.md#neg-input) |
+| **Missing Metadata and Sparse Fixtures** | [Note](resources/missing-metadata-and-sparse-fixtures.md) | Harshil Srivastav | 2026-11-22 | Research Note | Active | FR-1–FR-4, FR-6, TQ-4 | [NEG-METADATA](../docs/testing/acceptance-cases.md#neg-metadata), [NEG-UNAVAILABLE](../docs/testing/acceptance-cases.md#neg-unavailable), [NEG-PROFILE](../docs/testing/acceptance-cases.md#neg-profile), [ST-FR4](../docs/testing/acceptance-cases.md#st-fr4) |
+| **Account Activity Timestamp Provenance** | [Note](resources/account-activity-timestamp-provenance.md) | Harshil Srivastav | 2026-11-22 | Research Note | Active | FR-3, FR-4, TQ-3, TBD-3 | [ST-FR4](../docs/testing/acceptance-cases.md#st-fr4) |
+| **Ranking Evaluation Metrics** | [Note](resources/ranking-evaluation-metrics.md) | Harshil Srivastav | 2026-11-22 | Research Note | Active | FR-1–FR-3, FR-6, TQ-1, TQ-3, TBD-4, TBD-8 | [QA-RELEVANCE](../docs/testing/acceptance-cases.md#qa-relevance), [UT-SCORE](../docs/testing/acceptance-cases.md#ut-score), [ST-FR6](../docs/testing/acceptance-cases.md#st-fr6) |
 
 ---
 
 ## 2. Requirement-to-Note Traceability Index
 
 This section maps core SRS requirements to their authoritative research notes and specifications:
+
+### Discovery, Analytics and Ranking (FR-1–FR-4, FR-6)
+
+- **FR-1–FR-3:** [Candidate bounds and local ranking](resources/candidate-retrieval-and-tfidf.md) and [missing metadata fixtures](resources/missing-metadata-and-sparse-fixtures.md).
+- **FR-4:** [Date provenance and trend disclosure](resources/account-activity-timestamp-provenance.md) and [sparse duration and category fixtures](resources/missing-metadata-and-sparse-fixtures.md).
+- **FR-6:** [Local score explanations](resources/candidate-retrieval-and-tfidf.md) and [paired ranking evaluation](resources/ranking-evaluation-metrics.md).
 
 ### Platform, Provider, and Offline Execution (FR-11)
 - **FR-11.1 (VideoProvider interface)**: [`resources/official-api-provider-design.md`](resources/official-api-provider-design.md), [`resources/fixture-provider-and-ci-isolation.md`](resources/fixture-provider-and-ci-isolation.md)
@@ -64,6 +74,10 @@ This section maps core SRS requirements to their authoritative research notes an
 
 | Planned Test Scenario | Testing Document | Authoritative Research Notes |
 | :--- | :--- | :--- |
+| **ST-FR1–ST-FR3** | [Videos](../docs/testing/acceptance-cases.md#st-fr1), [channels](../docs/testing/acceptance-cases.md#st-fr2), [recommendations](../docs/testing/acceptance-cases.md#st-fr3) | [Candidate Retrieval and TF-IDF](resources/candidate-retrieval-and-tfidf.md) |
+| **ST-FR4** | [Engagement](../docs/testing/acceptance-cases.md#st-fr4) | [Timestamp Provenance](resources/account-activity-timestamp-provenance.md), [Sparse Fixtures](resources/missing-metadata-and-sparse-fixtures.md) |
+| **NEG-INPUT, NEG-UNAVAILABLE, NEG-METADATA, NEG-PROFILE** | [Input](../docs/testing/acceptance-cases.md#neg-input), [unavailable](../docs/testing/acceptance-cases.md#neg-unavailable), [metadata](../docs/testing/acceptance-cases.md#neg-metadata), [profile](../docs/testing/acceptance-cases.md#neg-profile) | [Candidate Retrieval](resources/candidate-retrieval-and-tfidf.md), [Sparse Fixtures](resources/missing-metadata-and-sparse-fixtures.md) |
+| **UT-SCORE, ST-FR6, QA-RELEVANCE** | [Scoring](../docs/testing/acceptance-cases.md#ut-score), [explanations](../docs/testing/acceptance-cases.md#st-fr6), [evaluation](../docs/testing/acceptance-cases.md#qa-relevance) | [Ranking Evaluation Metrics](resources/ranking-evaluation-metrics.md) |
 | **`IT-PROVIDER`** | [`acceptance-cases.md#it-provider`](../docs/testing/acceptance-cases.md#it-provider) | [`official-api-provider-design.md`](resources/official-api-provider-design.md), [`fixture-provider-and-ci-isolation.md`](resources/fixture-provider-and-ci-isolation.md) |
 | **`IT-QUOTA`** | [`acceptance-cases.md#it-quota`](../docs/testing/acceptance-cases.md#it-quota) | [`quota-budgeting-and-caching.md`](resources/quota-budgeting-and-caching.md) |
 | **`IT-CACHE`** | [`acceptance-cases.md#it-cache`](../docs/testing/acceptance-cases.md#it-cache) | [`quota-budgeting-and-caching.md`](resources/quota-budgeting-and-caching.md) |
@@ -83,9 +97,12 @@ This section maps core SRS requirements to their authoritative research notes an
 
 | ID | Title / Topic | Owner | Relevant Note / Document | Target Milestone | Status & Actionable Next Step |
 | :--- | :--- | :--- | :--- | :--- | :--- |
+| **TBD-3** | Like timestamps and trend fallback | Harshil Srivastav | [Timestamp Provenance](resources/account-activity-timestamp-provenance.md) | C05 evidence / C23 implementation | **Open.** Use the disclosed publication fallback until a like-event source can be verified. |
+| **TBD-4** | Ranking weights and provisional precision@5 target | Harshil Srivastav | [Ranking Evaluation Metrics](resources/ranking-evaluation-metrics.md) | C08 design / C26 evaluation | **Open.** Keep SRS defaults and evaluate them against TF-IDF alone. |
 | **TBD-5** | Repository Licence & Distribution | Aangir Doshi | [`resources/licensing-and-distribution.md`](resources/licensing-and-distribution.md) | Stage 1 close / C04–C06 | **Open / Baselined**: MIT vs Apache 2.0 evaluated. Team confirmation in Stage 1 review; publication verified in C36. |
 | **TBD-6** | Minimum YouTube Write Scope | Aangir Doshi | [`resources/oauth-lifecycle-and-safe-storage.md`](resources/oauth-lifecycle-and-safe-storage.md) | Stage 2 / C10 | **Open**: Compare `youtube` vs `youtube.force-ssl` in ADR-003. |
 | **TBD-7** | Live Demo Reauthorisation Plan | Aangir Doshi | [`resources/oauth-lifecycle-and-safe-storage.md`](resources/oauth-lifecycle-and-safe-storage.md) | Before Stage 4 / C31 | **Open**: Capture re-auth checklist for testing-mode 7-day token renewal. |
+| **TBD-8** | Labelled seed set | Harshil Srivastav | [Ranking Evaluation Metrics](resources/ranking-evaluation-metrics.md) | C08 design / C26 evaluation | **Open.** Freeze at least 20 public seeds and their labelled candidate sets. |
 | **TBD-11**| YouTube Quota Allocations & Method Costs | Aangir Doshi | [`resources/quota-budgeting-and-caching.md`](resources/quota-budgeting-and-caching.md) | Stage 3 / C19 & C31 | **Open / Baselined**: Initial 10k/100 search baseline established. Validate live Google Cloud metrics in C19. |
 
 ---
@@ -95,5 +112,5 @@ This section maps core SRS requirements to their authoritative research notes an
 | Teammate | Assigned Commits | Delivered Research Notes | AI Sessions Logged | Status |
 | :--- | :--- | :---: | :---: | :--- |
 | **Aangir Doshi** (BT2024078) | C01, C04, C07, C10, C13, C16, C19, C22, C25, C28, C31, C36 | 4 notes (`official-api`, `quota-budgeting`, `oauth-storage`, `fixture-ci`) + 1 decision record (`licensing`) | C01, C04 logged | Active (C04 Delivered) |
-| **Harshil Srivastav** (BT2024187) | C02, C05, C08, C11, C14, C17, C20, C23, C26, C29, C32, C34 | 4 notes scheduled in C05 | C02 logged | Pending C05 |
+| **Harshil Srivastav** (BT2024187) | C02, C05, C08, C11, C14, C17, C20, C23, C26, C29, C32, C34 | 4 C05 notes verified locally | [C05-S01](log.md#session-c05-s01-discovery-and-analytics-evidence) | C05 delivered, teammate approval reported by Harshil |
 | **Ayush Patel** (BT2024171) | C03, C06, C09, C12, C15, C18, C21, C24, C27, C30, C33, C35 | 4 notes scheduled in C06 | C03 logged | Pending C06 |

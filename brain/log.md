@@ -61,3 +61,13 @@ This append-only log tracks additions, modifications, decision milestones, and s
   - Automated Python script executed to validate YAML frontmatter keys across all notes in `brain/resources/`.
   - Path and anchor link validation for cross-references to `docs/requirements-traceability.md`, `docs/testing/acceptance-cases.md`, and `FocusList_Commit_Plan.md`.
   - Secret scanning scan verifying zero API keys, client secrets, bearer tokens, or PII in `brain/`.
+
+### Session C05-S01: Discovery and Analytics Evidence
+
+- **Date:** 2026-11-22 (IST). **Teammate / operator:** Harshil Srivastav. **AI tool:** Codex.
+- **Assignment:** [C05](../FocusList_Commit_Plan.md#c05-document-discovery-and-analytics-evidence), covering FR-1–FR-4, FR-6 and TBD-3.
+- **Research notes:** [Candidate retrieval and TF-IDF](resources/candidate-retrieval-and-tfidf.md), [missing metadata and sparse fixtures](resources/missing-metadata-and-sparse-fixtures.md), [account activity timestamp provenance](resources/account-activity-timestamp-provenance.md) and [ranking evaluation metrics](resources/ranking-evaluation-metrics.md).
+- **Decisions and evidence:** Compared the course brief and SRS with official API references. Documented playlist-add and subscription event fields separately from video publication, with a planned warning for fallback and a separate undated case. Liked-event provenance remains open under TBD-3. Linked deterministic examples to [C02 acceptance cases](../docs/testing/acceptance-cases.md), updated the [vault index](index.md) and connected the [requirements matrix](../docs/requirements-traceability.md) to the notes.
+- **Verification:** A local PowerShell here-string piped to `python -` used PyYAML to parse all four frontmatter blocks. It checked added relative paths and Markdown anchors, verified the eight supporting-note rows and recalculated the worked duration and ranking examples. `git -c core.safecrlf=false diff --check` checked the tracked changes for whitespace errors. The new note files were checked for trailing whitespace by the Python check.
+- **Review:** Harshil reported teammate approval before publication. GitHub had no C05 pull request at the time.
+- **Pending evidence:** The fixture variants are specifications for future implementation. Authenticated YouTube calls, MCP fixture runs and ranking benchmarks were outside this session.
