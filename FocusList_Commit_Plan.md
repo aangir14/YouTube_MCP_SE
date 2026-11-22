@@ -278,7 +278,7 @@ I am Aangir Doshi, the owner of C04. Apply the Shared Antigravity instructions. 
 
 **Commit message** `docs(evidence): record discovery and analytics findings`
 
-- [ ] Pending · Actual date (IST) — · Evidence — <!-- C05-status -->
+- [x] Done · Actual date (IST) 2026-11-22 · Evidence: Four C05 notes in the [Second Brain index](brain/index.md) and eight traceability rows verified locally. YAML frontmatter, relative paths and anchors, and worked fixture arithmetic passed. The [timestamp note](brain/resources/account-activity-timestamp-provenance.md) records event provenance, publication-date disclosure and the open TBD-3 question. Harshil reported teammate approval before publication. [Verification and session log](brain/log.md#session-c05-s01-discovery-and-analytics-evidence). <!-- C05-status -->
 
 **Implementation**
 
