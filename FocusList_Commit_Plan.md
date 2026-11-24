@@ -302,7 +302,7 @@ I am Harshil Srivastav, the owner of C05. Apply the Shared Antigravity instructi
 
 **Commit message** `docs(review): close the requirements milestone`
 
-- [ ] Pending · Actual date (IST) — · Evidence — <!-- C06-status -->
+- [x] Done · Actual date (IST) 24 Nov 2026 · Evidence: Authored 4 Ayush research notes (playlist-constraints-and-duration-solver.md, proposal-disclosure-and-metadata-sanitization.md, confirmation-gate-and-action-lifecycle.md, skill-format-and-upstream-specification.md) bringing Second Brain vault to 13 notes across 3 teammates. Closed TBD-10 with verified upstream skill format limits. Authored docs/stage-1-review.md reviewing coverage across FR-1–FR-5, SK-2, and TQ-1–TQ-6. Reconciled all 11 Appendix C TBDs in brain/index.md and updated traceability matrix. Ayush verified with team review. <!-- C06-status -->
 
 **Implementation**
 

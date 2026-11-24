@@ -6,6 +6,12 @@ This append-only log tracks additions, modifications, decision milestones, and s
 
 ## Chronological Change Log
 
+### 2026-11-24 · Commit C06: Requirements Milestone Closure and Stage 1 Review
+- **Author**: Ayush Patel (BT2024171)
+- **Commit Reference**: C06 (`docs(review): close the requirements milestone`)
+- **SRS Scope**: FR-5, FR-7, SK-0, SK-2, SE-5–SE-6, SB-1–SB-6, TBD-10
+- **Summary**: Delivered four curation and Agent Skill research notes (`playlist-constraints-and-duration-solver.md`, `proposal-disclosure-and-metadata-sanitization.md`, `confirmation-gate-and-action-lifecycle.md`, `skill-format-and-upstream-specification.md`). Resolved TBD-10 regarding upstream skill format limits. Authored the comprehensive Stage 1 Review (`docs/stage-1-review.md`) verifying coverage across all 5 course FRs, SK-2, and TQ-1–TQ-6 testing requirements. Reconciled all 11 Appendix C TBDs in `brain/index.md` and completed Stage 1 handoff to Stage 2.
+
 ### 2026-11-19 · Commit C04: Platform Constraints and Second Brain Initialization
 - **Author**: Aangir Doshi (BT2024078)
 - **Commit Reference**: C04 (`docs(platform): record provider and credential constraints`)
@@ -61,6 +67,26 @@ This append-only log tracks additions, modifications, decision milestones, and s
   - Automated Python script executed to validate YAML frontmatter keys across all notes in `brain/resources/`.
   - Path and anchor link validation for cross-references to `docs/requirements-traceability.md`, `docs/testing/acceptance-cases.md`, and `FocusList_Commit_Plan.md`.
   - Secret scanning scan verifying zero API keys, client secrets, bearer tokens, or PII in `brain/`.
+
+### Session C06-S01: Curation Research Notes, Skill Upstream Specification, and Stage 1 Review
+- **Date**: 2026-11-24 (IST)
+- **Teammate / Operator**: Ayush Patel (BT2024171)
+- **AI Model**: Antigravity (Gemini 3.8 Flash High)
+- **Session Goals**:
+  1. Inspect existing project repository state, baselined SRS, AGENTS.md, C01–C05 commits, and Commit Plan C06 specifications.
+  2. Author four Ayush-owned research notes covering deterministic duration solver, proposal disclosure with metadata sanitization, human confirmation gate & action lifecycle, and Agent Skill format standards.
+  3. Close TBD-10 by investigating and recording upstream Google Antigravity and Agent Skill ecosystem specifications.
+  4. Write the Stage 1 Review (`docs/stage-1-review.md`) reconciling requirements coverage, Second Brain inventory (13 notes across 3 teammates), and Appendix C decisions.
+  5. Update `brain/index.md`, `brain/log.md`, `docs/requirements-traceability.md`, and `FocusList_Commit_Plan.md`.
+- **Key Decisions & Resolutions**:
+  - Pinned integer-second duration solver architecture with bounded knapsack formulation, $\pm 5\%$ tolerance, and explicit nearest achievable runtime reporting on infeasible constraint sets.
+  - Formulated metadata sanitization pipeline stripping zero-width unicode (`\u200B`–`\u200D`, `\uFEFF`) and control characters, truncating descriptions to 500 characters, and marking external data with `untrusted: true` to prevent prompt injection.
+  - Specified cryptographic HMAC-SHA-256 proposal token binding canonical fields with 30-minute expiry, single-use atomic SQLite claims, and idempotent zero-write replays.
+  - Resolved TBD-10 by documenting exact upstream skill limits: `name` $\le 64$ chars (lowercase alphanumeric and hyphens), `description` $\le 1024$ chars, mandatory uppercase `SKILL.md`, and 3 deterministic evaluations per skill.
+- **Verification Performed**:
+  - Python scripts validated YAML frontmatter schema across all notes in `brain/resources/`.
+  - Markdown link validation for internal relative paths and anchors.
+  - Secret scan confirmed absence of API keys, bearer tokens, or PII.
 
 ### Session C05-S01: Discovery and Analytics Evidence
 
