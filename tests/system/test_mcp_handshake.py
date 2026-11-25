@@ -81,10 +81,10 @@ async def test_mcp_get_video_details_call() -> None:
     import json
 
     server = create_server()
-    res = await server.call_tool("get_video_details", {"video_url_or_id": "syn_vid_0001"})
+    res = await server.call_tool("get_video_details", {"video_url_or_id": "syn_vid0001"})
     content_list = res[0] if isinstance(res, tuple) else res
     assert len(content_list) >= 1
     data = json.loads(content_list[0].text)
     assert "result" in data
-    assert data["result"]["video_id"] == "syn_vid_0001"
+    assert data["result"]["video_id"] == "syn_vid0001"
     assert data["meta"]["quota_used"] == 1

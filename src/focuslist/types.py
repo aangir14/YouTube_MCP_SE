@@ -2,21 +2,26 @@
 
 from __future__ import annotations
 
-import re
+import unicodedata
 from datetime import datetime
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
+
+LanguageProvenance = Literal["audio", "metadata", "public_uploads", "unknown"]
 
 
 def sanitize_untrusted_text(text: str | None, max_length: int = 500) -> str:
     """Sanitize untrusted YouTube text: strip control chars and zero-width spaces, and truncate."""
     if not text:
         return ""
-    # Strip control chars and zero-width spaces
-    cleaned = re.sub(r"[\x00-\x1f\x7f-\x9f\u200b\ufeff]", "", text).strip()
+    cleaned = "".join(
+        char for char in text if unicodedata.category(char) not in {"Cc", "Cf", "Cs"}
+    ).strip()
     if len(cleaned) > max_length:
-        return cleaned[:max_length].rstrip() + "..."
+        if max_length <= 3:
+            return cleaned[:max(0, max_length)]
+        return cleaned[:max_length - 3].rstrip() + "..."
     return cleaned
 
 
@@ -46,23 +51,27 @@ class VideoRecord(BaseModel):
     title: str = Field(description="Sanitized video title")
     channel_id: str = Field(description="Owning channel ID")
     channel_title: str = Field(description="Sanitized owning channel name")
-    description: str = Field(default="", description="Sanitized description excerpt (<=500 chars)")
+    description: str | None = Field(default=None, description="Untrusted description excerpt")
     published_at: datetime | None = Field(default=None, description="UTC publication timestamp")
-    duration_seconds: int = Field(default=0, ge=0, description="Video duration in integer seconds")
-    duration_iso: str = Field(default="PT0S", description="ISO-8601 duration on wire")
-    tags: list[str] = Field(default_factory=list, description="Sanitized video tags")
+    duration_seconds: int | None = Field(default=None, ge=0, description="Known duration in seconds")
+    duration_iso: str | None = Field(default=None, description="Known ISO-8601 duration on wire")
+    tags: list[str] | None = Field(default=None, description="Sanitized video tags when supplied")
     category_id: str | None = Field(default=None, description="YouTube numeric category ID")
     language: str | None = Field(default=None, description="BCP-47 language tag")
-    is_live: bool = Field(default=False, description="True if currently live broadcast")
-    is_upcoming: bool = Field(default=False, description="True if scheduled upcoming broadcast")
-    is_age_restricted: bool = Field(default=False, description="True if marked age restricted")
+    language_provenance: LanguageProvenance = "unknown"
+    visibility: Literal["public", "unlisted", "private"] | None = None
+    is_live: bool | None = Field(default=None, description="True if currently live broadcast")
+    is_upcoming: bool | None = Field(default=None, description="True if scheduled upcoming broadcast")
+    is_age_restricted: bool | None = Field(default=None, description="True if marked age restricted")
     has_captions: bool | None = Field(default=None, description="True if captions are present")
     view_count: int | None = Field(default=None, ge=0, description="Public view count")
     like_count: int | None = Field(default=None, ge=0, description="Public like count")
     untrusted: bool = Field(default=True, description="Marker indicating external metadata")
 
     @property
-    def duration_display(self) -> str:
+    def duration_display(self) -> str | None:
+        if self.duration_seconds is None:
+            return None
         return format_duration_display(self.duration_seconds)
 
 
@@ -75,7 +84,10 @@ class ChannelRecord(BaseModel):
     canonical_url: str = Field(description="Canonical channel URL")
     title: str = Field(description="Sanitized channel title")
     handle: str | None = Field(default=None, description="Channel @handle if present")
-    description: str = Field(default="", description="Sanitized channel description")
+    description: str | None = Field(default=None, description="Untrusted channel description")
+    keywords: list[str] | None = None
+    language: str | None = None
+    language_provenance: LanguageProvenance = "unknown"
     topic_categories: list[str] = Field(default_factory=list, description="Topic taxonomy URLs")
     subscriber_count: int | None = Field(default=None, ge=0, description="Subscriber count")
     video_count: int | None = Field(default=None, ge=0, description="Total video count")

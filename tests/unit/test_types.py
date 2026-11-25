@@ -23,7 +23,7 @@ def test_sanitize_untrusted_text() -> None:
     # Truncation test
     long_text = "A" * 600
     truncated = sanitize_untrusted_text(long_text, max_length=500)
-    assert len(truncated) <= 503  # 500 chars + "..."
+    assert len(truncated) == 500
     assert truncated.endswith("...")
 
 
@@ -40,10 +40,10 @@ def test_format_duration_display() -> None:
 def test_video_record_model() -> None:
     """Verify VideoRecord construction and duration formatting property."""
     v = VideoRecord(
-        video_id="syn_vid_0001",
-        canonical_url="https://www.youtube.com/watch?v=syn_vid_0001",
+        video_id="syn_vid0001",
+        canonical_url="https://www.youtube.com/watch?v=syn_vid0001",
         title="Recursion in Python",
-        channel_id="UCsyn_001",
+        channel_id="UCsyn_chan_0000000000001",
         channel_title="Tech Academy",
         duration_seconds=900,
         duration_iso="PT15M0S",
@@ -55,7 +55,7 @@ def test_video_record_model() -> None:
 def test_result_envelope_serialization() -> None:
     """Verify ResultEnvelope conforms to SRS COM-1 to COM-4 standard JSON shape."""
     envelope = ResultEnvelope(
-        result={"videos": ["syn_vid_0001"]},
+        result={"videos": ["syn_vid0001"]},
         meta=MetaEnvelope(
             quota_used=1,
             quota_remaining=9999,

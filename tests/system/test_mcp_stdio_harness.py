@@ -49,13 +49,13 @@ async def test_stdio_fixture_tool_calls_deterministic() -> None:
         assert quota_res["result"]["general_units_remaining"] == 10000
 
         vid_res_1 = await client.call_tool_json(
-            "get_video_details", {"video_url_or_id": "syn_vid_0001"}
+            "get_video_details", {"video_url_or_id": "syn_vid0001"}
         )
         vid_res_2 = await client.call_tool_json(
-            "get_video_details", {"video_url_or_id": "syn_vid_0001"}
+            "get_video_details", {"video_url_or_id": "syn_vid0001"}
         )
         assert vid_res_1["result"] == vid_res_2["result"]
-        assert vid_res_1["result"]["video_id"] == "syn_vid_0001"
+        assert vid_res_1["result"]["video_id"] == "syn_vid0001"
         assert vid_res_1["result"]["untrusted_metadata"] is True
     client.cleanup_stderr()
 
@@ -65,10 +65,10 @@ async def test_stdio_custom_fixture_dir_selection(tmp_path: Path) -> None:
     """Verify FOCUSLIST_FIXTURE_DIR selects isolated synthetic fixtures over stdio."""
     custom_videos = [
         {
-            "video_id": "c10_test_001",
-            "canonical_url": "https://www.youtube.com/watch?v=c10_test_001",
+            "video_id": "c10_test001",
+            "canonical_url": "https://www.youtube.com/watch?v=c10_test001",
             "title": "C10 Isolated Fixture Video",
-            "channel_id": "UC_c10_test_chan",
+            "channel_id": "UCc10_test_chan_00000001",
             "channel_title": "C10 Test Channel",
             "description": "Synthetic C10 test video.",
             "duration_seconds": 300,
@@ -81,9 +81,9 @@ async def test_stdio_custom_fixture_dir_selection(tmp_path: Path) -> None:
 
     async with McpStdioTestClient(provider="fixture", fixture_dir=tmp_path) as client:
         res = await client.call_tool_json(
-            "get_video_details", {"video_url_or_id": "c10_test_001"}
+            "get_video_details", {"video_url_or_id": "c10_test001"}
         )
-        assert res["result"]["video_id"] == "c10_test_001"
+        assert res["result"]["video_id"] == "c10_test001"
         assert res["result"]["title"] == "C10 Isolated Fixture Video"
         assert res["result"]["duration_seconds"] == 300
     client.cleanup_stderr()

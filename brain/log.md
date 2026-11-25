@@ -159,6 +159,14 @@ This append-only log tracks additions, modifications, decision milestones, and s
 - **Publication check:** The owner requested publication after C07 merged. The ADR uses the merged scaffold's identifier parameter names and documents the retained period shorthand and production source-selection requirement. Against merged `main`, `python -m pytest -q` passed all 33 tests with `FOCUSLIST_PROVIDER=fixture` in a fresh Python 3.12 environment with MCP 1.30.0. `python -m ruff check .` passed.
 - **Open evidence:** C07 interface gaps are documented in the ADR. Teammate PR review, product MCP checks and C26's measured ranking results remain pending.
 
+### Session C11-S01: Shared Metadata Normalisation
+
+- **Date:** 2026-11-25 (IST). **Teammate / operator:** Harshil Srivastav. **AI tool:** Codex.
+- **Assignment:** [C11](../FocusList_Commit_Plan.md#c11-normalise-identifiers-duration-and-metadata). Pulled through C10, based on `f694e34`. Checked the [SRS](../FocusList_SRS_Condensed.docx), plan and merged ADRs before editing.
+- **Dependency audit:** Verified C08's frozen 20-seed manifest and 380 directed judgements. C08 is merged and its plan checkbox remains open. ADR-002's recommendation row gives freshness/duration 0.20/0.10, while SRS §6.4 and plan §4 prescribe 0.15/0.15. This is a follow-up for Harshil before C20/C26. Verified C09's state and approval design, eight threat entries and links. C10's fixture provider, fault injection and stdio harness passed the pulled 49-test baseline. Live scope and demo-client approval checks remain with C22/C24. GitHub recorded the three merges without formal PR reviews.
+- **Implementation:** [Caller guide](../docs/development/metadata-normalisation.md) and [UT-PARSE](../docs/testing/acceptance-cases.md#ut-parse). Normalized syntactically equivalent YouTube references, rejected malformed inputs ahead of provider access, and left missing C07 fields nullable with explicit language and timestamp provenance. Updated synthetic identifiers to match the strict public format.
+- **Verification:** `FOCUSLIST_PROVIDER=fixture` with `python -m pytest -q` passed 145 tests, including C10's stdio harness and C11's provider-counter tests. `python -m ruff check .` and `git -c core.safecrlf=false diff --check` passed. A read-only Python check verified the manifest, eight threat IDs, 43 ADR/usage links and synthetic fixture cross-references. Owner and teammate review remain pending.
+
 ### Session C09-S01: Playlist Action Lifecycle and Threat Model
 
 - **Date:** 2026-11-25 (IST). **Teammate / operator:** Ayush Patel. **AI tool:** Antigravity.
