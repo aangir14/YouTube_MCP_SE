@@ -118,6 +118,14 @@ class FaultInjectionProvider(VideoProvider):
         self._before_call("search_candidates")
         return self.target.search_candidates(query, max_results=max_results)
 
+    def search_video_ids(self, query: str, max_results: int = 50) -> list[str]:
+        self._before_call("search_video_ids")
+        return self.target.search_video_ids(query, max_results=max_results)
+
+    def get_channel_upload_ids(self, channel_id: str, max_results: int = 50) -> list[str]:
+        self._before_call("get_channel_upload_ids")
+        return self.target.get_channel_upload_ids(channel_id, max_results=max_results)
+
     def get_channel_details(
         self,
         channel_id: str | None = None,

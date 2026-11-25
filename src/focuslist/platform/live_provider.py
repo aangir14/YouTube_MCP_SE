@@ -243,7 +243,8 @@ class LiveVideoProvider(VideoProvider):
             except FocusListError:
                 dur_seconds = None
 
-        live_flag = snippet.get("liveBroadcastContent", "none")
+        live_flag = snippet.get("liveBroadcastContent")
+        live_known = live_flag in ("none", "live", "upcoming")
         lang, lang_prov = select_video_language(
             snippet.get("defaultAudioLanguage"),
             snippet.get("defaultLanguage"),
@@ -262,7 +263,7 @@ class LiveVideoProvider(VideoProvider):
             title=sanitize_untrusted_text(snippet.get("title") or ""),
             channel_id=str(snippet.get("channelId") or ""),
             channel_title=sanitize_untrusted_text(snippet.get("channelTitle") or ""),
-            description=sanitize_untrusted_text(snippet.get("description") or ""),
+            description=snippet.get("description"),
             published_at=_parse_optional_utc(snippet.get("publishedAt")),
             duration_seconds=dur_seconds,
             duration_iso=format_duration_iso(dur_seconds) if dur_seconds is not None else None,
@@ -270,8 +271,9 @@ class LiveVideoProvider(VideoProvider):
             category_id=snippet.get("categoryId"),
             language=lang,
             language_provenance=lang_prov,
-            is_live=live_flag == "live",
-            is_upcoming=live_flag == "upcoming",
+            visibility=privacy if privacy in ("public", "unlisted", "private") else None,
+            is_live=live_flag == "live" if live_known else None,
+            is_upcoming=live_flag == "upcoming" if live_known else None,
             is_age_restricted=age_restricted,
             has_captions=has_captions,
             view_count=_safe_int(stats.get("viewCount")),
@@ -305,9 +307,19 @@ class LiveVideoProvider(VideoProvider):
     def search_candidates(self, query: str, max_results: int = 50) -> list[VideoRecord]:
         self.call_counts["search_candidates"] += 1
         self.requests += 1
-        service = self._ensure_service()
-
         cap = max(1, min(max_results, 150))
+        ids = self._search_ids(query, cap)
+        return self.get_video_details(ids) if ids else []
+
+    def search_video_ids(self, query: str, max_results: int = 50) -> list[str]:
+        if max_results <= 0:
+            return []
+        self.call_counts["search_video_ids"] += 1
+        self.requests += 1
+        return self._search_ids(query, min(max_results, _MAX_BATCH_SIZE))
+
+    def _search_ids(self, query: str, cap: int) -> list[str]:
+        service = self._ensure_service()
         collected_ids: list[str] = []
         page_token: str | None = None
         pages_used = 0
@@ -335,9 +347,7 @@ class LiveVideoProvider(VideoProvider):
             if not page_token:
                 break
 
-        if not collected_ids:
-            return []
-        return self.get_video_details(collected_ids)
+        return collected_ids
 
     def get_channel_details(
         self,
@@ -393,6 +403,17 @@ class LiveVideoProvider(VideoProvider):
     ) -> list[VideoRecord]:
         self.call_counts["get_channel_recent_uploads"] += 1
         self.requests += 1
+        ids = self._channel_upload_ids(channel_id, max(1, min(max_results, _MAX_BATCH_SIZE)))
+        return self.get_video_details(ids) if ids else []
+
+    def get_channel_upload_ids(self, channel_id: str, max_results: int = 50) -> list[str]:
+        if max_results <= 0:
+            return []
+        self.call_counts["get_channel_upload_ids"] += 1
+        self.requests += 1
+        return self._channel_upload_ids(channel_id, min(max_results, _MAX_BATCH_SIZE))
+
+    def _channel_upload_ids(self, channel_id: str, cap: int) -> list[str]:
         service = self._ensure_service()
 
         ch_resp = self._execute_request(
@@ -409,7 +430,6 @@ class LiveVideoProvider(VideoProvider):
         if not uploads_id:
             return []
 
-        cap = max(1, min(max_results, _MAX_BATCH_SIZE))
         pl_resp = self._execute_request(
             "playlistItems.list",
             service.playlistItems().list(
@@ -421,10 +441,7 @@ class LiveVideoProvider(VideoProvider):
             for it in pl_resp.get("items", [])
             if isinstance(it, dict)
         ]
-        video_ids = [vid for vid in video_ids if vid][:cap]
-        if not video_ids:
-            return []
-        return self.get_video_details(video_ids)
+        return [vid for vid in video_ids if vid][:cap]
 
     def get_user_likes(
         self,

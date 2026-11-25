@@ -22,10 +22,12 @@ class McpStdioTestClient:
         provider: str = "fixture",
         fixture_dir: Path | str | None = None,
         extra_env: dict[str, str] | None = None,
+        server_args: list[str] | None = None,
     ) -> None:
         self.provider = provider
         self.fixture_dir = Path(fixture_dir) if fixture_dir else None
         self.extra_env = extra_env or {}
+        self.server_args = server_args
         self._stack = AsyncExitStack()
         self._session: ClientSession | None = None
         self._init_result: Any = None
@@ -52,7 +54,7 @@ class McpStdioTestClient:
 
         server_params = StdioServerParameters(
             command=sys.executable,
-            args=["-m", "focuslist.cli", "serve", "--provider", self.provider],
+            args=self.server_args or ["-m", "focuslist.cli", "serve", "--provider", self.provider],
             env=env,
         )
 

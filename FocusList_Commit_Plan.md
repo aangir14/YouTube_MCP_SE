@@ -500,7 +500,7 @@ I am Aangir Doshi, the owner of C13. Apply the Shared Antigravity instructions. 
 
 **Commit message** `feat(discovery): rank similar videos and expose video details`
 
-- [ ] Pending · Actual date (IST) — · Evidence — <!-- C14-status -->
+- [ ] In progress · Actual date (IST) 2026-11-26 · Evidence: [ST-FR1 stdio and call counts](docs/testing/c14-video-discovery-evidence.md). Verified C08 FR-1 scores and traces, C11 parsing, candidate eligibility and date/ID ties; 150 candidates, 10/50 result limits, zero provider calls for invalid/over-budget inputs, and two searches / six general units on mocked official transport. Full fixture suite: 190 passed. Ruff and diff checks passed. Teammate PR review pending. <!-- C14-status -->
 
 **Implementation**
 

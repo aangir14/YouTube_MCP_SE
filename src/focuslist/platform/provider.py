@@ -11,6 +11,8 @@ from focuslist.types import AccountActivityRecord, ChannelRecord, VideoRecord
 class VideoProvider(ABC):
     """Abstract interface isolating all YouTube API operations behind a typed boundary."""
 
+    network_attempts: int
+
     @abstractmethod
     def get_video_details(self, video_ids: list[str]) -> list[VideoRecord]:
         """Fetch metadata for up to 50 videos in one batched call (costs 1 unit)."""
@@ -19,6 +21,16 @@ class VideoProvider(ABC):
     @abstractmethod
     def search_candidates(self, query: str, max_results: int = 50) -> list[VideoRecord]:
         """Search for candidate videos matching the query (costs 100 units)."""
+        ...
+
+    @abstractmethod
+    def search_video_ids(self, query: str, max_results: int = 50) -> list[str]:
+        """Read at most one search page of IDs, without fetching video details."""
+        ...
+
+    @abstractmethod
+    def get_channel_upload_ids(self, channel_id: str, max_results: int = 50) -> list[str]:
+        """Resolve the uploads playlist and read at most one page of video IDs."""
         ...
 
     @abstractmethod

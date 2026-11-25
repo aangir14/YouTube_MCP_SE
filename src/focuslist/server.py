@@ -7,24 +7,22 @@ import sys
 from typing import Any
 
 from mcp.server.fastmcp import FastMCP
+from pydantic import StrictInt
 
 from focuslist.clock import SystemClock
 from focuslist.config import Settings, get_settings
 from focuslist.context import RequestContext
+from focuslist.discovery.videos import VideoDiscovery
 from focuslist.errors import (
     ChannelUnavailableError,
-    ErrorCode,
     FocusListError,
     InvalidArgumentsError,
 )
 from focuslist.metadata import (
     normalise_language_tag,
-    normalise_video_record,
     parse_channel_reference,
     parse_duration_seconds,
     parse_playlist_id,
-    parse_video_id,
-    video_watch_url,
 )
 from focuslist.platform import create_provider
 from focuslist.types import format_duration_display
@@ -46,6 +44,7 @@ def create_server(
     cfg = settings or get_settings()
     ctx = context or RequestContext(settings=cfg, clock=SystemClock())
     provider = create_provider(settings=cfg)
+    video_discovery = VideoDiscovery(provider, ctx)
 
     mcp = FastMCP(
         name="focuslist",
@@ -64,74 +63,16 @@ def create_server(
         description="Fetch verified metadata fact sheet and public statistics for a YouTube video.",
     )
     def get_video_details(video_url_or_id: str) -> dict[str, Any]:
-        """Fetch video metadata fact sheet (costs 1 general quota unit)."""
-        try:
-            vid = parse_video_id(video_url_or_id)
-        except FocusListError as exc:
-            return ctx.failure(exc).model_dump()
-
-        ctx.record_quota_charge(1)
-        videos = provider.get_video_details([vid])
-        record = next((video for video in videos if video.video_id == vid), None)
-        if record is None or record.visibility == "private":
-            return ctx.failure(
-                FocusListError(ErrorCode.VIDEO_UNAVAILABLE)
-            ).model_dump()
-
-        video = normalise_video_record(record)
-        return ctx.success(
-            {
-                "video_id": video.video_id,
-                "canonical_url": video_watch_url(vid),
-                "title": video.title,
-                "channel_title": video.channel_title,
-                "channel_id": video.channel_id,
-                "duration": video.duration_display,
-                "duration_seconds": video.duration_seconds,
-                "duration_iso": video.duration_iso,
-                "description": video.description,
-                "language": video.language,
-                "language_provenance": video.language_provenance,
-                "view_count": video.view_count,
-                "like_count": video.like_count,
-                "published_at": video.published_at.isoformat() if video.published_at else None,
-                "untrusted_metadata": video.untrusted,
-            }
-        ).model_dump()
+        """Fetch one normalized fact sheet without candidate searches."""
+        return video_discovery.tool_response(lambda: video_discovery.details(video_url_or_id))
 
     @mcp.tool(
         name="similar_videos",
         description="Discover and rank YouTube videos similar to a seed video using metadata similarity.",
     )
-    def similar_videos(video_url_or_id: str, limit: int = 10) -> dict[str, Any]:
-        """Discover similar videos with component explanations (costs <=6 general units)."""
-        try:
-            seed_id = parse_video_id(video_url_or_id)
-        except FocusListError as exc:
-            return ctx.failure(exc).model_dump()
-
-        if limit < 1 or limit > 50:
-            return ctx.failure(
-                InvalidArgumentsError("Limit must be between 1 and 50.")
-            ).model_dump()
-
-        ctx.record_quota_charge(6)
-        candidates = provider.search_candidates("recursion", max_results=limit)
-        results = [
-            {
-                "video_id": v.video_id,
-                "title": v.title,
-                "channel_title": v.channel_title,
-                "duration": v.duration_display,
-                "score": round(max(0.1, 1.0 - (idx * 0.12)), 4),
-                "rank": idx + 1,
-                "reason": f"High TF-IDF title cosine match with seed tags (rank #{idx + 1}).",
-            }
-            for idx, v in enumerate(candidates[:limit])
-        ]
-        return ctx.success(
-            {"seed": seed_id, "count": len(results), "videos": results}
-        ).model_dump()
+    def similar_videos(video_url_or_id: str, limit: StrictInt = 10) -> dict[str, Any]:
+        """Rank eligible metadata candidates with bounded provider calls."""
+        return video_discovery.tool_response(lambda: video_discovery.similar(video_url_or_id, limit))
 
     @mcp.tool(
         name="similar_channels",
