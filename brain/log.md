@@ -6,6 +6,15 @@ This append-only log tracks additions, modifications, decision milestones, and s
 
 ## Chronological Change Log
 
+### 2026-11-25 · Commit C12: Pure Playlist Constraint Solver & Proposal Schema
+- **Author**: Ayush Patel (BT2024171)
+- **Commit Reference**: C12 (`feat(curation): establish playlist constraints and solver tests`)
+- **SRS Scope**: FR-5.1–5.8, FR-5.15, NFR-REL, TQ-1
+- **Changes Delivered**:
+  1. **Proposal Argument Schema & Validators**: Added `PlaylistProposalRequest`, `ValidatedPlaylistConstraints`, and `validate_proposal_arguments` (`src/focuslist/curation/constraints.py`) reusing C11's `parse_duration_seconds`, `normalise_language_tag`, and `parse_video_id`. Rejects unknown fields, out-of-range caps, and contradictory bounds before any discovery call.
+  2. **Pure Deterministic Duration Solver & FR-5 Scorer**: Added `solve_playlist`, `filter_eligible_candidates`, `score_candidates_fr5` (`0.65/0.10/0.10/0.10/0.05` with objective non-engagement `capped_quality`), and `greedy_baseline_select` (`src/focuslist/curation/solver.py`). Returns explicit feasible or nearest-infeasible `SolverResult` with unmet constraint breakdowns.
+  3. **Boundary, Baseline & Property Tests**: Added `tests/unit/test_curation_constraints_and_solver.py` (22 tests including 250 randomized property cases) and documented baseline comparison & Stage 2 evidence in `docs/testing/curation-solver-baseline.md`.
+
 ### 2026-11-25 · Commit C10: Deterministic Fixture Provider, Fault Injection, and MCP Stdio Harness
 - **Author**: Aangir Doshi (BT2024078)
 - **Commit Reference**: C10 (`feat(testkit): add the fixture provider and MCP harness`)
