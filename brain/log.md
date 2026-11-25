@@ -6,6 +6,16 @@ This append-only log tracks additions, modifications, decision milestones, and s
 
 ## Chronological Change Log
 
+### 2026-11-25 · Commit C10: Deterministic Fixture Provider, Fault Injection, and MCP Stdio Harness
+- **Author**: Aangir Doshi (BT2024078)
+- **Commit Reference**: C10 (`feat(testkit): add the fixture provider and MCP harness`)
+- **SRS Scope**: FR-9, FR-11, TQ-2–TQ-5, TBD-2, TBD-6
+- **Changes Delivered**:
+  1. **Deterministic Fixture Provider & Counters**: Enhanced `FixtureVideoProvider` with deterministic ID-sorted outputs, `requests`, `network_attempts`, `writes`, `call_log`, and `reset_counters()`.
+  2. **Normalized Fault Injection**: Extended `FaultInjectionProvider` with `NORMALIZED_FAULT_MAP` and `inject_normalized_fault()` covering quota, rate, unavailable, timeout, no_channel, auth, and upstream 500/503 faults, distinguishing preflight rejections from outbound attempts.
+  3. **Scripted Stdio MCP Test Harness**: Added `McpStdioTestClient` (`tests/mcp_harness.py`) and `tests/system/test_mcp_stdio_harness.py` exercising real subprocess startup, JSON-RPC handshake, capability listing, fixture selection, stderr/stdout isolation, and clean teardown.
+  4. **ADR-003 (TBD-6 & TBD-2)**: Documented minimum writable OAuth scope analysis (`youtube.force-ssl` vs `youtube`, live check pending C22) and offline MCP elicitation capability evidence (live AI-client UI check pending C24).
+
 ### 2026-11-25 · Commit C07: Scaffold the Python MCP Service
 - **Author**: Aangir Doshi (BT2024078)
 - **Commit Reference**: C07 (`chore(build): scaffold the Python MCP service`)

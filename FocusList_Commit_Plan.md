@@ -401,7 +401,7 @@ I am Ayush Patel, the owner of C09. Apply the Shared Antigravity instructions. R
 
 **Commit message** `feat(testkit): add the fixture provider and MCP harness`
 
-- [ ] Pending · Actual date (IST) — · Evidence — <!-- C10-status -->
+- [x] Done · Actual date (IST) 2026-11-25 · Evidence: Enhanced `FixtureVideoProvider` (deterministic sorting, `requests`/`network_attempts`/`writes`/`call_log`) and `FaultInjectionProvider` (`inject_normalized_fault` across quota, rate, unavailable, timeout, no_channel, auth, and 500/503 faults). Added `McpStdioTestClient` (`tests/mcp_harness.py`) and `tests/system/test_mcp_stdio_harness.py` verifying subprocess handshake, deterministic fixture calls, `FOCUSLIST_FIXTURE_DIR` isolation, stderr/stdout separation, and teardown. Documented `ADR-003` (`docs/adr/ADR-003-minimum-write-scope-and-elicitation.md`) for TBD-6 and offline elicitation findings for TBD-2 (live OAuth scope and live AI-client UI checks remain pending C22/C24). Verified locally: `python -m pytest -v` (49 passed), `python -m ruff check .` (All checks passed). <!-- C10-status -->
 
 **Implementation**
 

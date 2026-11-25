@@ -26,11 +26,46 @@ class FixtureVideoProvider(VideoProvider):
             self.fixture_dir = Path(fixture_dir)
 
         self.call_counts: dict[str, int] = defaultdict(int)
+        self.call_log: list[dict[str, Any]] = []
+        self.requests: int = 0
+        self.network_attempts: int = 0
+        self.writes: int = 0
         self._videos: dict[str, VideoRecord] = {}
         self._channels: dict[str, ChannelRecord] = {}
         self._categories: list[dict[str, Any]] = []
         self._created_playlists: dict[str, dict[str, Any]] = {}
         self._load_fixtures()
+
+    def reset_counters(self) -> None:
+        """Reset instrumentation counters and call log for isolated test assertions."""
+        self.call_counts.clear()
+        self.call_log.clear()
+        self.requests = 0
+        self.network_attempts = 0
+        self.writes = 0
+
+    def _record_call(
+        self,
+        method: str,
+        *,
+        is_write: bool = False,
+        network_attempt: bool = True,
+        **args: Any,
+    ) -> None:
+        self.call_counts[method] += 1
+        self.requests += 1
+        if network_attempt:
+            self.network_attempts += 1
+        if is_write:
+            self.writes += 1
+        self.call_log.append(
+            {
+                "method": method,
+                "args": args,
+                "is_write": is_write,
+                "network_attempt": network_attempt,
+            }
+        )
 
     def _load_fixtures(self) -> None:
         """Load synthetic fixtures from JSON files if present."""
@@ -59,7 +94,7 @@ class FixtureVideoProvider(VideoProvider):
                 self._categories = json.load(f)
 
     def get_video_details(self, video_ids: list[str]) -> list[VideoRecord]:
-        self.call_counts["get_video_details"] += 1
+        self._record_call("get_video_details", video_ids=list(video_ids))
         results: list[VideoRecord] = []
         for vid in video_ids:
             if vid in self._videos:
@@ -67,17 +102,18 @@ class FixtureVideoProvider(VideoProvider):
         return results
 
     def search_candidates(self, query: str, max_results: int = 50) -> list[VideoRecord]:
-        self.call_counts["search_candidates"] += 1
+        self._record_call("search_candidates", query=query, max_results=max_results)
         q_lower = query.lower()
+        ordered_videos = sorted(self._videos.values(), key=lambda v: v.video_id)
         matched: list[VideoRecord] = []
-        for v in self._videos.values():
+        for v in ordered_videos:
             if q_lower in v.title.lower() or any(q_lower in tag.lower() for tag in v.tags):
                 matched.append(v)
             if len(matched) >= max_results:
                 break
-        # Fallback to returning available candidates if search matches none
+        # Fallback to returning available candidates deterministically if search matches none
         if not matched:
-            matched = list(self._videos.values())[:max_results]
+            matched = ordered_videos[:max_results]
         return matched
 
     def get_channel_details(
@@ -85,17 +121,18 @@ class FixtureVideoProvider(VideoProvider):
         channel_id: str | None = None,
         handle: str | None = None,
     ) -> ChannelRecord | None:
-        self.call_counts["get_channel_details"] += 1
+        self._record_call("get_channel_details", channel_id=channel_id, handle=handle)
         if channel_id and channel_id in self._channels:
             return self._channels[channel_id]
         if handle:
             h_clean = handle.lstrip("@").lower()
-            for c in self._channels.values():
+            for cid in sorted(self._channels):
+                c = self._channels[cid]
                 if c.handle and c.handle.lstrip("@").lower() == h_clean:
                     return c
-        # If any channel exists, return first as mock fallback
+        # If any channel exists, return first deterministically as mock fallback
         if self._channels:
-            return next(iter(self._channels.values()))
+            return self._channels[min(self._channels)]
         return None
 
     def get_channel_recent_uploads(
@@ -103,8 +140,13 @@ class FixtureVideoProvider(VideoProvider):
         channel_id: str,
         max_results: int = 20,
     ) -> list[VideoRecord]:
-        self.call_counts["get_channel_recent_uploads"] += 1
-        res = [v for v in self._videos.values() if v.channel_id == channel_id]
+        self._record_call(
+            "get_channel_recent_uploads", channel_id=channel_id, max_results=max_results
+        )
+        res = sorted(
+            (v for v in self._videos.values() if v.channel_id == channel_id),
+            key=lambda v: v.video_id,
+        )
         return res[:max_results]
 
     def get_user_likes(
@@ -112,7 +154,8 @@ class FixtureVideoProvider(VideoProvider):
         account_id: str,
         max_results: int = 200,
     ) -> list[AccountActivityRecord]:
-        self.call_counts["get_user_likes"] += 1
+        self._record_call("get_user_likes", account_id=account_id, max_results=max_results)
+        ordered_videos = sorted(self._videos.values(), key=lambda v: v.video_id)
         return [
             AccountActivityRecord(
                 item_id=v.video_id,
@@ -121,7 +164,7 @@ class FixtureVideoProvider(VideoProvider):
                 channel_id=v.channel_id,
                 timestamp_provenance="genuine",
             )
-            for v in list(self._videos.values())[:max_results]
+            for v in ordered_videos[:max_results]
         ]
 
     def get_user_subscriptions(
@@ -129,7 +172,10 @@ class FixtureVideoProvider(VideoProvider):
         account_id: str,
         max_results: int = 200,
     ) -> list[AccountActivityRecord]:
-        self.call_counts["get_user_subscriptions"] += 1
+        self._record_call(
+            "get_user_subscriptions", account_id=account_id, max_results=max_results
+        )
+        ordered_channels = sorted(self._channels.values(), key=lambda c: c.channel_id)
         return [
             AccountActivityRecord(
                 item_id=c.channel_id,
@@ -138,7 +184,7 @@ class FixtureVideoProvider(VideoProvider):
                 channel_id=c.channel_id,
                 timestamp_provenance="genuine",
             )
-            for c in list(self._channels.values())[:max_results]
+            for c in ordered_channels[:max_results]
         ]
 
     def get_user_playlists(
@@ -146,7 +192,7 @@ class FixtureVideoProvider(VideoProvider):
         account_id: str,
         max_results: int = 50,
     ) -> list[dict[str, Any]]:
-        self.call_counts["get_user_playlists"] += 1
+        self._record_call("get_user_playlists", account_id=account_id, max_results=max_results)
         return [
             {
                 "playlist_id": pid,
@@ -154,13 +200,13 @@ class FixtureVideoProvider(VideoProvider):
                 "item_count": len(p["items"]),
                 "privacy": p["privacy"],
             }
-            for pid, p in self._created_playlists.items()
+            for pid, p in sorted(self._created_playlists.items())
         ][:max_results]
 
     def get_categories(self, region_code: str = "US") -> list[dict[str, Any]]:
-        self.call_counts["get_categories"] += 1
+        self._record_call("get_categories", region_code=region_code)
         if self._categories:
-            return self._categories
+            return sorted(self._categories, key=lambda c: str(c.get("id", "")))
         return [
             {"id": "10", "title": "Music"},
             {"id": "27", "title": "Education"},
@@ -168,7 +214,7 @@ class FixtureVideoProvider(VideoProvider):
         ]
 
     def check_channel_eligibility(self, account_id: str) -> bool:
-        self.call_counts["check_channel_eligibility"] += 1
+        self._record_call("check_channel_eligibility", account_id=account_id)
         return True
 
     def create_playlist(
@@ -177,7 +223,9 @@ class FixtureVideoProvider(VideoProvider):
         description: str,
         privacy: str = "private",
     ) -> str:
-        self.call_counts["create_playlist"] += 1
+        self._record_call(
+            "create_playlist", is_write=True, title=title, privacy=privacy
+        )
         pid = f"PL_syn_{len(self._created_playlists) + 1:04d}"
         self._created_playlists[pid] = {
             "title": title,
@@ -193,7 +241,13 @@ class FixtureVideoProvider(VideoProvider):
         video_id: str,
         position: int | None = None,
     ) -> str:
-        self.call_counts["insert_playlist_item"] += 1
+        self._record_call(
+            "insert_playlist_item",
+            is_write=True,
+            playlist_id=playlist_id,
+            video_id=video_id,
+            position=position,
+        )
         if playlist_id not in self._created_playlists:
             self._created_playlists[playlist_id] = {
                 "title": "Ad-hoc Playlist",
@@ -201,12 +255,16 @@ class FixtureVideoProvider(VideoProvider):
                 "privacy": "private",
                 "items": [],
             }
-        item_id = f"PLI_syn_{len(self._created_playlists[playlist_id]['items']) + 1:04d}"
-        self._created_playlists[playlist_id]["items"].append(video_id)
+        items = self._created_playlists[playlist_id]["items"]
+        item_id = f"PLI_syn_{len(items) + 1:04d}"
+        if position is not None and 0 <= position <= len(items):
+            items.insert(position, video_id)
+        else:
+            items.append(video_id)
         return item_id
 
     def delete_playlist(self, playlist_id: str) -> bool:
-        self.call_counts["delete_playlist"] += 1
+        self._record_call("delete_playlist", is_write=True, playlist_id=playlist_id)
         if playlist_id in self._created_playlists:
             del self._created_playlists[playlist_id]
             return True
