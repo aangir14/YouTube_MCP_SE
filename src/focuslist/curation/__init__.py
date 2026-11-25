@@ -13,6 +13,11 @@ from focuslist.curation.constraints import (
     ValidatedPlaylistConstraints,
     validate_proposal_arguments,
 )
+from focuslist.curation.proposals import (
+    ProposalSignerHook,
+    QuotaPreflightHook,
+    propose_playlist_action,
+)
 from focuslist.curation.solver import (
     FR5_WEIGHTS,
     ConstraintViolation,
@@ -33,12 +38,15 @@ __all__ = [
     "HARD_MAX_ITEMS",
     "ConstraintViolation",
     "PlaylistProposalRequest",
+    "ProposalSignerHook",
+    "QuotaPreflightHook",
     "ScoredCandidate",
     "SelectedPlaylistItem",
     "SolverResult",
     "ValidatedPlaylistConstraints",
     "filter_eligible_candidates",
     "greedy_baseline_select",
+    "propose_playlist_action",
     "score_candidates_fr5",
     "solve_playlist",
     "validate_proposal_arguments",

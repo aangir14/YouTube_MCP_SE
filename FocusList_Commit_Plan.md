@@ -524,7 +524,7 @@ I am Harshil Srivastav, the owner of C14. Apply the Shared Antigravity instructi
 
 **Commit message** `feat(playlist): build read-only constraint proposals`
 
-- [ ] Pending · Actual date (IST) — · Evidence — <!-- C15-status -->
+- [x] Done · Actual date (IST) 2026-11-26 · Evidence: Implemented `propose_playlist_action` (`src/focuslist/curation/proposals.py`) and wired `propose_playlist` in `src/focuslist/server.py` using C11 normalisation, C12 schema/solver, bounded retrieval (<=3 searches, <=150 items), and C19/C21 quota/signing seams with zero writes. Verified offline via `tests/unit/test_proposal_service.py` and `tests/system/test_propose_playlist_mcp.py`: `ruff check .` clean, `pytest -q` (196 passed in 18.52s). Persistence, HMAC signing, and final quota ledger remain tracked at C16, C19, and C21. <!-- C15-status -->
 
 **Implementation**
 
