@@ -1,0 +1,318 @@
+{
+  "version": "c08-mit6006-v1",
+  "verified_on": "2026-11-25",
+  "catalog_url": "https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/resources/lecture-videos/",
+  "candidate_rule": "all manifest videos except self; ascending ASCII video_id",
+  "judgement_rule": "listed relevant_candidate_ids = 1, every other frozen candidate = 0",
+  "shared_fixture_metadata": {
+    "channel_key": "mit-ocw-fixture",
+    "language": "en",
+    "duration_seconds": null,
+    "published_at": null,
+    "tags": null,
+    "category_id": null
+  },
+  "seeds": [
+    {
+      "n": 1,
+      "source": "https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/resources/lecture-1-algorithms-and-computation/",
+      "video_id": "ZA-tUyM_y7s",
+      "title": "Algorithms and computation",
+      "description": "Introductory models, correctness and efficiency.",
+      "judgement_basis": "Foundations, analysis or broad course synthesis.",
+      "relevant_candidate_ids": [
+        "2NMtS1ecb3o",
+        "CHhwJjR0mZA",
+        "JbafQJx1CIA",
+        "oS9aPzUNG-s"
+      ]
+    },
+    {
+      "n": 2,
+      "source": "https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/resources/lecture-2-data-structures-and-dynamic-arrays/",
+      "video_id": "CHhwJjR0mZA",
+      "title": "Data structures and dynamic arrays",
+      "description": "Sequence operations and resizable arrays.",
+      "judgement_basis": "Data-structure selection, operations and their costs.",
+      "relevant_candidate_ids": [
+        "76dhtgZt38A",
+        "Nu8YGneFCWE",
+        "Xnpo1atN-Iw",
+        "ZA-tUyM_y7s",
+        "oS9aPzUNG-s"
+      ]
+    },
+    {
+      "n": 3,
+      "source": "https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/resources/lecture-3-sets-and-sorting/",
+      "video_id": "oS9aPzUNG-s",
+      "title": "Sets and sorting",
+      "description": "Set interfaces and comparison sorting.",
+      "judgement_basis": "Ordering or data structures that support set and priority operations.",
+      "relevant_candidate_ids": [
+        "76dhtgZt38A",
+        "CHhwJjR0mZA",
+        "Nu8YGneFCWE",
+        "U1JYwHcFfso",
+        "Xnpo1atN-Iw",
+        "yndgIDO0zQQ"
+      ]
+    },
+    {
+      "n": 4,
+      "source": "https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/resources/lecture-4-hashing/",
+      "video_id": "Nu8YGneFCWE",
+      "title": "Hashing",
+      "description": "Dictionary operations and hash tables.",
+      "judgement_basis": "Alternative dictionary structures or hashing concepts used in linear sorting.",
+      "relevant_candidate_ids": [
+        "76dhtgZt38A",
+        "CHhwJjR0mZA",
+        "U1JYwHcFfso",
+        "oS9aPzUNG-s",
+        "yndgIDO0zQQ"
+      ]
+    },
+    {
+      "n": 5,
+      "source": "https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/resources/lecture-5-linear-sorting/",
+      "video_id": "yndgIDO0zQQ",
+      "title": "Linear sorting",
+      "description": "Linear-time integer sorting methods.",
+      "judgement_basis": "Sorting prerequisites, hashing connections or analysis of running-time bounds.",
+      "relevant_candidate_ids": [
+        "CHhwJjR0mZA",
+        "JbafQJx1CIA",
+        "Nu8YGneFCWE",
+        "oS9aPzUNG-s"
+      ]
+    },
+    {
+      "n": 6,
+      "source": "https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/resources/lecture-6-binary-trees-part-1/",
+      "video_id": "76dhtgZt38A",
+      "title": "Binary trees",
+      "description": "Binary tree representation, traversal and operations.",
+      "judgement_basis": "Tree representation, tree operations or DFS traversal.",
+      "relevant_candidate_ids": [
+        "CHhwJjR0mZA",
+        "IBfWDYSffUU",
+        "U1JYwHcFfso",
+        "Xnpo1atN-Iw",
+        "oS9aPzUNG-s"
+      ]
+    },
+    {
+      "n": 7,
+      "source": "https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/resources/lecture-7-binary-trees-part-2-avl/",
+      "video_id": "U1JYwHcFfso",
+      "title": "AVL trees",
+      "description": "Balanced search trees and rotations.",
+      "judgement_basis": "Ordered data structures, underlying tree operations or a contrasting heap.",
+      "relevant_candidate_ids": [
+        "76dhtgZt38A",
+        "CHhwJjR0mZA",
+        "Xnpo1atN-Iw",
+        "oS9aPzUNG-s"
+      ]
+    },
+    {
+      "n": 8,
+      "source": "https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/resources/lecture-8-binary-heaps/",
+      "video_id": "Xnpo1atN-Iw",
+      "title": "Binary heaps",
+      "description": "Heap operations, priority queues and sorting.",
+      "judgement_basis": "Sorting, array/tree structures for ordered access or Dijkstra’s use of priority queues.",
+      "relevant_candidate_ids": [
+        "76dhtgZt38A",
+        "NSHizBK9JD8",
+        "U1JYwHcFfso",
+        "oS9aPzUNG-s",
+        "yndgIDO0zQQ"
+      ]
+    },
+    {
+      "n": 9,
+      "source": "https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/resources/lecture-9-breadth-first-search/",
+      "video_id": "oFVYVzlvk9c",
+      "title": "Breadth-first search",
+      "description": "Graph traversal by distance layers.",
+      "judgement_basis": "Graph traversal or related shortest-path reasoning.",
+      "relevant_candidate_ids": [
+        "5cF5Bgv59Sc",
+        "EmSmaW-ud6A",
+        "IBfWDYSffUU",
+        "NSHizBK9JD8",
+        "f9cVS_URPc0"
+      ]
+    },
+    {
+      "n": 10,
+      "source": "https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/resources/lecture-10-depth-first-search/",
+      "video_id": "IBfWDYSffUU",
+      "title": "Depth-first search",
+      "description": "Recursive graph traversal and ordering.",
+      "judgement_basis": "Graph/tree traversal or use of DAG ordering in path algorithms.",
+      "relevant_candidate_ids": [
+        "5cF5Bgv59Sc",
+        "76dhtgZt38A",
+        "EmSmaW-ud6A",
+        "oFVYVzlvk9c",
+        "r4-cftqTcdI"
+      ]
+    },
+    {
+      "n": 11,
+      "source": "https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/resources/lecture-11-weighted-shortest-paths/",
+      "video_id": "5cF5Bgv59Sc",
+      "title": "Weighted shortest paths",
+      "description": "Path relaxation and weighted graph cases.",
+      "judgement_basis": "Graph traversal foundations and direct continuations in shortest paths.",
+      "relevant_candidate_ids": [
+        "EmSmaW-ud6A",
+        "IBfWDYSffUU",
+        "NSHizBK9JD8",
+        "TDo3r5M1LNo",
+        "f9cVS_URPc0",
+        "oFVYVzlvk9c",
+        "r4-cftqTcdI"
+      ]
+    },
+    {
+      "n": 12,
+      "source": "https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/resources/lecture-12-bellman-ford/",
+      "video_id": "f9cVS_URPc0",
+      "title": "Bellman–Ford",
+      "description": "Relaxation for single-source paths with negative edge weights.",
+      "judgement_basis": "Alternative path solvers, relaxation, reweighting or path recurrences.",
+      "relevant_candidate_ids": [
+        "5cF5Bgv59Sc",
+        "EmSmaW-ud6A",
+        "NSHizBK9JD8",
+        "TDo3r5M1LNo",
+        "r4-cftqTcdI"
+      ]
+    },
+    {
+      "n": 13,
+      "source": "https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/resources/lecture-13-dijkstra/",
+      "video_id": "NSHizBK9JD8",
+      "title": "Dijkstra’s algorithm",
+      "description": "Greedy shortest paths for nonnegative edge weights.",
+      "judgement_basis": "Required priority-queue concepts, unweighted counterpart or related path algorithms.",
+      "relevant_candidate_ids": [
+        "5cF5Bgv59Sc",
+        "EmSmaW-ud6A",
+        "Xnpo1atN-Iw",
+        "f9cVS_URPc0",
+        "oFVYVzlvk9c"
+      ]
+    },
+    {
+      "n": 14,
+      "source": "https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/resources/lecture-14-apsp-and-johnson/",
+      "video_id": "EmSmaW-ud6A",
+      "title": "All-pairs paths and Johnson’s algorithm",
+      "description": "Reweighting and all-pairs shortest-path strategies.",
+      "judgement_basis": "Single-source subroutines and related all-pairs path recurrences.",
+      "relevant_candidate_ids": [
+        "5cF5Bgv59Sc",
+        "NSHizBK9JD8",
+        "TDo3r5M1LNo",
+        "f9cVS_URPc0",
+        "r4-cftqTcdI"
+      ]
+    },
+    {
+      "n": 15,
+      "source": "https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/resources/lecture-15-dynamic-programming-part-1-srtbot-fib-dags-bowling/",
+      "video_id": "r4-cftqTcdI",
+      "title": "Dynamic programming foundations",
+      "description": "Subproblems, dependencies and recurrences.",
+      "judgement_basis": "DAG dependencies, shortest path applications or continuation of the subproblem method.",
+      "relevant_candidate_ids": [
+        "5cF5Bgv59Sc",
+        "EmSmaW-ud6A",
+        "IBfWDYSffUU",
+        "KLBCUx1is2c",
+        "TDo3r5M1LNo",
+        "i9OAOk0CUQE"
+      ]
+    },
+    {
+      "n": 16,
+      "source": "https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/resources/lecture-16-dynamic-programming-part-2-lcs-lis-coins/",
+      "video_id": "KLBCUx1is2c",
+      "title": "Dynamic programming for sequences and coins",
+      "description": "Sequence problems and coin-selection recurrences.",
+      "judgement_basis": "DP foundations and further examples or tractability of problem variants.",
+      "relevant_candidate_ids": [
+        "JbafQJx1CIA",
+        "TDo3r5M1LNo",
+        "i9OAOk0CUQE",
+        "r4-cftqTcdI"
+      ]
+    },
+    {
+      "n": 17,
+      "source": "https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/resources/lecture-17-dynamic-programming-part-3-apsp-parens-piano/",
+      "video_id": "TDo3r5M1LNo",
+      "title": "Dynamic programming for paths and intervals",
+      "description": "All-pairs paths, parenthesization and interval-style problems.",
+      "judgement_basis": "Path problems or other direct applications of the same recurrence design.",
+      "relevant_candidate_ids": [
+        "5cF5Bgv59Sc",
+        "EmSmaW-ud6A",
+        "KLBCUx1is2c",
+        "f9cVS_URPc0",
+        "i9OAOk0CUQE",
+        "r4-cftqTcdI"
+      ]
+    },
+    {
+      "n": 18,
+      "source": "https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/resources/lecture-18-dynamic-programming-part-4-rods-subset-sum-pseudopolynomial/",
+      "video_id": "i9OAOk0CUQE",
+      "title": "Dynamic programming for rods and subsets",
+      "description": "Subset sum and pseudopolynomial time.",
+      "judgement_basis": "Related DP patterns and complexity of numeric subproblems.",
+      "relevant_candidate_ids": [
+        "JbafQJx1CIA",
+        "KLBCUx1is2c",
+        "TDo3r5M1LNo",
+        "r4-cftqTcdI"
+      ]
+    },
+    {
+      "n": 19,
+      "source": "https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/resources/lecture-19-complexity/",
+      "video_id": "JbafQJx1CIA",
+      "title": "Complexity",
+      "description": "Tractability and algorithmic complexity.",
+      "judgement_basis": "Time-bound analysis, complexity-linked examples or a course-level review.",
+      "relevant_candidate_ids": [
+        "2NMtS1ecb3o",
+        "KLBCUx1is2c",
+        "ZA-tUyM_y7s",
+        "i9OAOk0CUQE",
+        "yndgIDO0zQQ"
+      ]
+    },
+    {
+      "n": 20,
+      "source": "https://ocw.mit.edu/courses/6-006-introduction-to-algorithms-spring-2020/resources/lecture-20-course-review/",
+      "video_id": "2NMtS1ecb3o",
+      "title": "Course review",
+      "description": "Synthesis of selected algorithm and data-structure concepts.",
+      "judgement_basis": "Foundational or representative major course methods for a review learner.",
+      "relevant_candidate_ids": [
+        "5cF5Bgv59Sc",
+        "JbafQJx1CIA",
+        "ZA-tUyM_y7s",
+        "oFVYVzlvk9c",
+        "oS9aPzUNG-s",
+        "r4-cftqTcdI"
+      ]
+    }
+  ]
+}

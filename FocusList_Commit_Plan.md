@@ -353,7 +353,7 @@ I am Aangir Doshi, the owner of C07. Apply the Shared Antigravity instructions. 
 
 **Commit message** `docs(design): define ranking and evaluation contracts`
 
-- [ ] Pending · Actual date (IST) — · Evidence — <!-- C08-status -->
+- [ ] In progress · Actual date (IST) 2026-11-25 · Evidence: [Discovery and analytics ADR](docs/adr/ADR-002-discovery-analytics-and-ranking-evaluation.md), [paired evaluation protocol](docs/testing/ranking-evaluation.md) and [frozen manifest](docs/testing/ranking-evaluation-seeds.json). Verified 20 publisher-sourced public IDs, 380 judged pairs, deterministic equal-pool reference sorting, metric and analytics arithmetic, and added links. Contract checked against the C07 scaffold merged at `66a7c97`. [C08 verification log](brain/log.md#session-c08-s01-discovery-and-ranking-design). Teammate PR review pending. Product metrics remain for C26. <!-- C08-status -->
 
 **Implementation**
 
