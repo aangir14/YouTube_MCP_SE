@@ -254,7 +254,7 @@ I am Ayush Patel, the owner of C03. Apply the Shared Antigravity instructions. R
 
 **Commit message** `docs(platform): record provider and credential constraints`
 
-- [ ] In progress · Actual date (IST) 20 Nov 2026 · Evidence: [Second Brain](../brain/index.md) initialized with PARA structure (`inbox/`, `projects/`, `areas/`, `resources/`, `archive/`), [governance/frontmatter rules](../brain/README.md), and [activity log](../brain/log.md). Authored four platform research notes covering [official API/provider design](../brain/resources/official-api-provider-design.md), [quota budgeting and caching](../brain/resources/quota-budgeting-and-caching.md), [OAuth lifecycle and safe storage](../brain/resources/oauth-lifecycle-and-safe-storage.md), and [synthetic fixture CI isolation](../brain/resources/fixture-provider-and-ci-isolation.md), plus [licensing evaluation and TBD-5 tracking](../brain/resources/licensing-and-distribution.md). Captured 10,000-unit/100-search baseline for TBD-11. Updated 21 note links in [traceability matrix](docs/requirements-traceability.md). Validated YAML frontmatter, markdown links, and zero-secret scan. Owner diff review and teammate PR review pending. <!-- C04-status -->
+- [x] Done · Actual date (IST) 20 Nov 2026 · Evidence: [Second Brain](../brain/index.md) initialized with PARA structure (`inbox/`, `projects/`, `areas/`, `resources/`, `archive/`), [governance/frontmatter rules](../brain/README.md), and [activity log](../brain/log.md). Authored four platform research notes covering [official API/provider design](../brain/resources/official-api-provider-design.md), [quota budgeting and caching](../brain/resources/quota-budgeting-and-caching.md), [OAuth lifecycle and safe storage](../brain/resources/oauth-lifecycle-and-safe-storage.md), and [synthetic fixture CI isolation](../brain/resources/fixture-provider-and-ci-isolation.md), plus [licensing evaluation and TBD-5 tracking](../brain/resources/licensing-and-distribution.md). Captured 10,000-unit/100-search baseline for TBD-11. Updated 21 note links in [traceability matrix](docs/requirements-traceability.md). Validated YAML frontmatter, markdown links, and zero-secret scan. <!-- C04-status -->
 
 **Implementation**
 
@@ -353,7 +353,7 @@ I am Aangir Doshi, the owner of C07. Apply the Shared Antigravity instructions. 
 
 **Commit message** `docs(design): define ranking and evaluation contracts`
 
-- [ ] In progress · Actual date (IST) 2026-11-25 · Evidence: [Discovery and analytics ADR](docs/adr/ADR-002-discovery-analytics-and-ranking-evaluation.md), [paired evaluation protocol](docs/testing/ranking-evaluation.md) and [frozen manifest](docs/testing/ranking-evaluation-seeds.json). Verified 20 publisher-sourced public IDs, 380 judged pairs, deterministic equal-pool reference sorting, metric and analytics arithmetic, and added links. Contract checked against the C07 scaffold merged at `66a7c97`. [C08 verification log](brain/log.md#session-c08-s01-discovery-and-ranking-design). Teammate PR review pending. Product metrics remain for C26. <!-- C08-status -->
+- [x] Done · Actual date (IST) 2026-11-25 · Evidence: [Discovery and analytics ADR](docs/adr/ADR-002-discovery-analytics-and-ranking-evaluation.md), [paired evaluation protocol](docs/testing/ranking-evaluation.md) and [frozen manifest](docs/testing/ranking-evaluation-seeds.json). Verified 20 publisher-sourced public IDs, 380 judged pairs, deterministic equal-pool reference sorting, metric and analytics arithmetic, and added links. Contract checked against the C07 scaffold merged at `66a7c97`. [C08 verification log](brain/log.md#session-c08-s01-discovery-and-ranking-design). Product metrics remain for C26. <!-- C08-status -->
 
 **Implementation**
 
@@ -425,7 +425,7 @@ I am Aangir Doshi, the owner of C10. Apply the Shared Antigravity instructions. 
 
 **Commit message** `feat(metadata): validate identifiers and normalise durations`
 
-- [ ] In progress · Actual date (IST) 2026-11-25 · Evidence: [Metadata contract and caller guide](docs/development/metadata-normalisation.md). Implemented identifier, duration, UTC and primary-language parsing plus sparse C07 record normalization. Fixture MCP tests verified malformed inputs cause zero provider requests, outbound attempts, writes or quota charges. Full fixture suite: 145 passed. Ruff and diff checks passed. [Verification and C08–C10 audit](brain/log.md#session-c11-s01-shared-metadata-normalisation). Owner and teammate review pending. <!-- C11-status -->
+- [x] Done · Actual date (IST) 2026-11-25 · Evidence: [Metadata contract and caller guide](docs/development/metadata-normalisation.md). Implemented identifier, duration, UTC and primary-language parsing plus sparse C07 record normalization. Fixture MCP tests verified malformed inputs cause zero provider requests, outbound attempts, writes or quota charges. Full fixture suite: 145 passed. Ruff and diff checks passed. [Verification and C08–C10 audit](brain/log.md#session-c11-s01-shared-metadata-normalisation). PR #10 merged (`00ca0c8`). <!-- C11-status -->
 
 **Implementation**
 
@@ -500,7 +500,7 @@ I am Aangir Doshi, the owner of C13. Apply the Shared Antigravity instructions. 
 
 **Commit message** `feat(discovery): rank similar videos and expose video details`
 
-- [ ] In progress · Actual date (IST) 2026-11-26 · Evidence: [ST-FR1 stdio and call counts](docs/testing/c14-video-discovery-evidence.md). Verified C08 FR-1 scores and traces, C11 parsing, candidate eligibility and date/ID ties; 150 candidates, 10/50 result limits, zero provider calls for invalid/over-budget inputs, and two searches / six general units on mocked official transport. Full fixture suite: 190 passed. Ruff and diff checks passed. Teammate PR review pending. <!-- C14-status -->
+- [x] Done · Actual date (IST) 2026-11-26 · Evidence: [ST-FR1 stdio and call counts](docs/testing/c14-video-discovery-evidence.md). Verified C08 FR-1 scores and traces, C11 parsing, candidate eligibility and date/ID ties; 150 candidates, 10/50 result limits, zero provider calls for invalid/over-budget inputs, and two searches / six general units on mocked official transport. Full fixture suite: 190 passed. Ruff and diff checks passed. PR #13 merged (`335261e`). <!-- C14-status -->
 
 **Implementation**
 
@@ -524,7 +524,7 @@ I am Harshil Srivastav, the owner of C14. Apply the Shared Antigravity instructi
 
 **Commit message** `feat(playlist): build read-only constraint proposals`
 
-- [ ] Pending · Actual date (IST) — · Evidence — <!-- C15-status -->
+- [x] Done · Actual date (IST) 2026-11-26 · Evidence: Implemented `propose_playlist_action` (`src/focuslist/curation/proposals.py`) and wired `propose_playlist` in `src/focuslist/server.py` using C11 normalisation, C12 schema/solver, bounded retrieval (<=3 searches, <=150 items), and C19/C21 quota/signing seams with zero writes. Verified offline via `tests/unit/test_proposal_service.py` and `tests/system/test_propose_playlist_mcp.py`: `ruff check .` clean, `pytest -q` (196 passed in 18.52s). Persistence, HMAC signing, and final quota ledger remain tracked at C16, C19, and C21. <!-- C15-status -->
 
 **Implementation**
 

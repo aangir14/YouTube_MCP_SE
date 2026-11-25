@@ -6,6 +6,15 @@ This append-only log tracks additions, modifications, decision milestones, and s
 
 ## Chronological Change Log
 
+### 2026-11-26 · Commit C15: Read-Only Playlist Proposal Service
+- **Author**: Ayush Patel (BT2024171)
+- **Commit Reference**: C15 (`feat(playlist): build read-only constraint proposals`)
+- **SRS Scope**: FR-5.1–5.8, UI-1, TQ-3
+- **Changes Delivered**:
+  1. **Proposal Service**: Added `propose_playlist_action` (`src/focuslist/curation/proposals.py`) wiring C12 constraint validation, bounded candidate retrieval ($\le 3$ searches, $\le 150$ items, batched detail hydration), C11 normalisation, and C12 deterministic solver with C19 quota and C21 signing seams.
+  2. **MCP Server Wiring**: Replaced the C07 `propose_playlist` stub in `src/focuslist/server.py` with `propose_playlist_action`, returning full reviewable proposals (`PROPOSED`) or nearest achievable breakdowns (`INFEASIBLE`) with zero writes.
+  3. **Tests**: Added `tests/unit/test_proposal_service.py` and `tests/system/test_propose_playlist_mcp.py` exercising 2h/20m baseline, infeasible fallback, invalid input zero-call rejection, unknown-language policy, duplicate filtering, and zero writes over MCP stdio.
+
 ### 2026-11-25 · Commit C13: Official YouTube Data API v3 Read Adapter
 - **Author**: Aangir Doshi (BT2024078)
 - **Commit Reference**: C13 (`feat(provider): implement official YouTube read operations`)

@@ -12,6 +12,7 @@ from pydantic import StrictInt
 from focuslist.clock import SystemClock
 from focuslist.config import Settings, get_settings
 from focuslist.context import RequestContext
+from focuslist.curation import propose_playlist_action
 from focuslist.discovery.videos import VideoDiscovery
 from focuslist.errors import (
     ChannelUnavailableError,
@@ -19,13 +20,10 @@ from focuslist.errors import (
     InvalidArgumentsError,
 )
 from focuslist.metadata import (
-    normalise_language_tag,
     parse_channel_reference,
-    parse_duration_seconds,
     parse_playlist_id,
 )
 from focuslist.platform import create_provider
-from focuslist.types import format_duration_display
 
 # Stdio Hygiene: ensure diagnostics and internal logs route exclusively to stderr
 logging.basicConfig(
@@ -177,55 +175,34 @@ def create_server(
         max_item_duration: str,
         language: str = "en",
         item_limit: int = 30,
+        min_item_duration: str = "PT2M",
+        tolerance: float = 0.05,
+        allow_unknown_language: bool = False,
+        allow_age_restricted: bool = False,
+        ordering: str = "learning_path",
+        title: str | None = None,
+        privacy_status: str = "private",
+        seed: str | None = None,
+        session_minutes: int | None = None,
     ) -> dict[str, Any]:
         """Propose a study playlist satisfying hard constraints (read-only discovery)."""
-        if not topic or len(topic.strip()) < 1:
-            return ctx.failure(InvalidArgumentsError("Topic must not be empty.")).model_dump()
-
-        try:
-            parse_duration_seconds(target_duration, allow_zero=False)
-            parse_duration_seconds(max_item_duration, allow_zero=False)
-        except FocusListError as exc:
-            return ctx.failure(exc).model_dump()
-        normalised_language = normalise_language_tag(language)
-        if normalised_language is None:
-            return ctx.failure(
-                InvalidArgumentsError("Provide a known BCP 47 language tag, such as en.")
-            ).model_dump()
-
-        ctx.record_quota_charge(15)
-        candidates = provider.search_candidates(topic, max_results=min(item_limit, 5))
-        candidates = [candidate for candidate in candidates if candidate.duration_seconds is not None]
-        total_secs = sum(c.duration_seconds for c in candidates if c.duration_seconds is not None)
-        items = [
-            {
-                "order": idx + 1,
-                "video_id": c.video_id,
-                "title": c.title,
-                "channel_title": c.channel_title,
-                "duration": c.duration_display,
-                "score": 0.90,
-                "reason": f"High relevance to topic '{topic}'.",
-            }
-            for idx, c in enumerate(candidates)
-        ]
-        proposal_id = "prop_syn_001"
-        return ctx.success(
-            {
-                "proposal_id": proposal_id,
-                "title": f"Study Session: {topic.title()}",
-                "topic": topic,
-                "language": normalised_language,
-                "item_count": len(items),
-                "total_duration": format_duration_display(total_secs),
-                "total_duration_seconds": total_secs,
-                "estimated_write_cost": 51 + (50 * len(items)),
-                "expires_in_minutes": 30,
-                "confirmation_token": "token_hmac_sha256_mock_signature_valid",
-                "items": items,
-                "note": "Review the exact list above. Call confirm_playlist with proposal_id and token to create.",
-            }
-        ).model_dump()
+        raw_args: dict[str, Any] = {
+            "topic": topic,
+            "target_duration": target_duration,
+            "max_item_duration": max_item_duration,
+            "language": language,
+            "max_items": item_limit,
+            "min_item_duration": min_item_duration,
+            "tolerance": tolerance,
+            "allow_unknown_language": allow_unknown_language,
+            "allow_age_restricted": allow_age_restricted,
+            "ordering": ordering,
+            "title": title,
+            "privacy_status": privacy_status,
+            "seed": seed,
+            "session_minutes": session_minutes,
+        }
+        return propose_playlist_action(raw_args, provider=provider, context=ctx)
 
     @mcp.tool(
         name="confirm_playlist",
