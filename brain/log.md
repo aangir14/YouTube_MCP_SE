@@ -6,6 +6,15 @@ This append-only log tracks additions, modifications, decision milestones, and s
 
 ## Chronological Change Log
 
+### 2026-11-25 · Commit C13: Official YouTube Data API v3 Read Adapter
+- **Author**: Aangir Doshi (BT2024078)
+- **Commit Reference**: C13 (`feat(provider): implement official YouTube read operations`)
+- **SRS Scope**: FR-11, FR-1–FR-4, FR-12, COM-2, COM-5, TQ-2
+- **Changes Delivered**:
+  1. **Official Read Adapter**: Implemented all read-only `VideoProvider` operations in `src/focuslist/platform/live_provider.py` (`get_video_details`, `search_candidates`, `get_channel_details`, `get_channel_recent_uploads`, `get_user_likes`, `get_user_subscriptions`, `get_user_playlists`, `get_categories`, `check_channel_eligibility`) with 50-ID batching, strict page/item caps, verified TLS `httplib2.Http`, injected credentials/transport, `attempt_observer` hook for C19, and safe HTTP/timeout error mapping without echoing raw bodies.
+  2. **Sanitized Fixture Recorder**: Added `src/focuslist/platform/recorder.py` with public field allowlisting, text sanitization, and rejection of raw authorization tokens.
+  3. **ADR-005 & Tests**: Authored `docs/adr/ADR-005-official-youtube-provider-mapping.md`, `tests/integration/test_live_provider_mock.py`, and `tests/unit/test_fixture_recorder.py` (all offline with mocked service).
+
 ### 2026-11-25 · Commit C12: Pure Playlist Constraint Solver & Proposal Schema
 - **Author**: Ayush Patel (BT2024171)
 - **Commit Reference**: C12 (`feat(curation): establish playlist constraints and solver tests`)

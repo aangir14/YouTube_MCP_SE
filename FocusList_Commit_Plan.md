@@ -475,7 +475,7 @@ I am Ayush Patel, the owner of C12. Apply the Shared Antigravity instructions. R
 
 **Commit message** `feat(provider): implement official YouTube read operations`
 
-- [ ] Pending · Actual date (IST) — · Evidence — <!-- C13-status -->
+- [x] Done · Actual date (IST) 2026-11-25 · Evidence: Implemented read-only `LiveVideoProvider` (`src/focuslist/platform/live_provider.py`) with 50-ID batching, page/item caps, verified TLS transport, injected credentials/transport, `attempt_observer` hook for C19, C11 metadata normalisation, and safe HTTP/timeout error mapping. Added sanitized fixture recorder (`src/focuslist/platform/recorder.py`) and endpoint table in `docs/adr/ADR-005-official-youtube-provider-mapping.md`. Verified offline with mocked Google API service in `tests/integration/test_live_provider_mock.py` and `tests/unit/test_fixture_recorder.py`: `ruff check .` clean, `pytest -q` passed all tests with zero live network calls. <!-- C13-status -->
 
 **Implementation**
 
