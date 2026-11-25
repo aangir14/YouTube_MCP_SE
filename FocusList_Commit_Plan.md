@@ -377,7 +377,7 @@ I am Harshil Srivastav, the owner of C08. Apply the Shared Antigravity instructi
 
 **Commit message** `docs(design): specify the playlist action lifecycle`
 
-- [ ] Pending · Actual date (IST) — · Evidence — <!-- C09-status -->
+- [x] Done · Actual date (IST) 2026-11-25 · Evidence: [Curation ADR & Threat Model](docs/adr/ADR-004-playlist-action-lifecycle-and-threat-model.md) specifying the state transition table, separation of proposal/approval/write rights, canonical proposal signing & SQLite claim schema, elicitation/fallback approval paths, idempotent replay, ambiguous timeout reconciliation, deterministic DP selection objective, FR-5 scoring inputs (0.65/0.10/0.10/0.10/0.05), FR-8 diversity/ordering, and 8-threat model (TM-01–TM-08). Contract aligned with C07 (`ProposalRecord`, `ErrorCode`, `Clock`) with open choices (TBD-2, TBD-6, TBD-9, `UNDO_INELIGIBLE`) explicitly named. Link and pytest/ruff checks verified locally. <!-- C09-status -->
 
 **Implementation**
 
