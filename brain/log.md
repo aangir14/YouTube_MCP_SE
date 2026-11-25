@@ -6,6 +6,12 @@ This append-only log tracks additions, modifications, decision milestones, and s
 
 ## Chronological Change Log
 
+### 2026-11-25 · Commit C09: Playlist Action Lifecycle and Threat Model ADR
+- **Author**: Ayush Patel (BT2024171)
+- **Commit Reference**: C09 (`docs(design): specify the playlist action lifecycle`)
+- **SRS Scope**: FR-5, FR-7, FR-8, NFR-SAF, NFR-SEC, DB-2, DB-3
+- **Summary**: Authored [`docs/adr/ADR-004-playlist-action-lifecycle-and-threat-model.md`](../docs/adr/ADR-004-playlist-action-lifecycle-and-threat-model.md) defining the full curation state machine (`proposed`, `expired`, `superseded`, `confirmed`, `creating`, `completed`, `partially_created`, `resuming`, `undone`), separation of proposal/approval/write rights, canonical proposal fields and HMAC-SHA-256 signing, elicitation and conversational approval paths, idempotent replay, ambiguous timeout reconciliation, deterministic DP selection objective with objective `capped_quality` (FR-5 weights `0.65/0.10/0.10/0.10/0.05`), FR-8 diversity/ordering, and an 8-threat security model (`TM-01`–`TM-08`).
+
 ### 2026-11-25 · Commit C07: Scaffold the Python MCP Service
 - **Author**: Aangir Doshi (BT2024078)
 - **Commit Reference**: C07 (`chore(build): scaffold the Python MCP service`)
@@ -142,3 +148,11 @@ This append-only log tracks additions, modifications, decision milestones, and s
 - **Verification:** A local PowerShell here-string piped to `python -` validated IDs, paths, anchors and judgement membership, then checked identical candidate sets, deterministic sorting in a standard-library reference calculation, the metric examples, UTC offsets and duration-bin edges. `git -c core.safecrlf=false diff --check` passed.
 - **Publication check:** The owner requested publication after C07 merged. The ADR uses the merged scaffold's identifier parameter names and documents the retained period shorthand and production source-selection requirement. Against merged `main`, `python -m pytest -q` passed all 33 tests with `FOCUSLIST_PROVIDER=fixture` in a fresh Python 3.12 environment with MCP 1.30.0. `python -m ruff check .` passed.
 - **Open evidence:** C07 interface gaps are documented in the ADR. Teammate PR review, product MCP checks and C26's measured ranking results remain pending.
+
+### Session C09-S01: Playlist Action Lifecycle and Threat Model
+
+- **Date:** 2026-11-25 (IST). **Teammate / operator:** Ayush Patel. **AI tool:** Antigravity.
+- **Assignment:** [C09](../FocusList_Commit_Plan.md#c09-design-the-playlist-action-lifecycle), covering FR-5, FR-7, FR-8, NFR-SAF, NFR-SEC, DB-2, DB-3.
+- **Decisions and evidence:** Authored [`docs/adr/ADR-004-playlist-action-lifecycle-and-threat-model.md`](../docs/adr/ADR-004-playlist-action-lifecycle-and-threat-model.md) aligned with C07's `ProposalRecord`, `ErrorCode`, and `Clock` contracts. Specified the state transition table, single-use atomic SQLite claims, HMAC-SHA-256 canonical signing, idempotent replay (`0` additional writes), reconciliation-first timeout recovery, deterministic selection objective with objective `capped_quality`, and threat model `TM-01`–`TM-08`. Named open choices (TBD-2, TBD-6, TBD-9, `UNDO_INELIGIBLE`, `capped_quality` thresholds).
+- **Verification:** Validated relative markdown links across `ADR-004` and `brain/index.md`, ran `git diff --check`, and verified `pytest` (33 passed) and `ruff check .` against the `.venv` environment.
+- **Open evidence:** Teammate PR review and C12/C15/C21/C24/C27/C30 implementation checks remain pending.
