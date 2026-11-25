@@ -6,6 +6,19 @@ This append-only log tracks additions, modifications, decision milestones, and s
 
 ## Chronological Change Log
 
+### 2026-11-25 · Commit C07: Scaffold the Python MCP Service
+- **Author**: Aangir Doshi (BT2024078)
+- **Commit Reference**: C07 (`chore(build): scaffold the Python MCP service`)
+- **SRS Scope**: UI-1–UI-5, COM-1–COM-6, FR-11, NFR-PORT
+- **Changes Delivered**:
+  1. **Package Setup & Entry Point**: Configured `pyproject.toml` with `focuslist = "focuslist.cli:app"`, dependencies (`mcp`, `pydantic`, `pydantic-settings`, `typer`, `anyio`, `httpx`, `google-api-python-client`, `google-auth`, `google-auth-oauthlib`, `cryptography`), dev dependencies (`pytest`, `pytest-asyncio`, `ruff`), and ruff configuration (`B008` ignore).
+  2. **FastMCP Server & Stdio Protocol Isolation**: Created `src/focuslist/server.py` registering 13 tool endpoints, 2 resources (`focuslist://config/scoring`, `focuslist://quota/status`), and 2 prompts (`video-to-playlist`, `playlist-audit`). Enforced strict stderr logging isolation ensuring stdout carries 100% JSON-RPC protocol traffic (COM-1).
+  3. **Injectable Seams & Shared Contracts**: Built `src/focuslist/clock.py` (`Clock` protocol, `SystemClock`, `FakeClock`), `src/focuslist/types.py` (`VideoRecord`, `ChannelRecord`, `AccountActivityRecord`, `RankedItemRecord`, `ProposalRecord`, `QuotaStatusRecord`, `MetaEnvelope`, `ResultEnvelope`, `ErrorInfo`, `ErrorEnvelope`, text sanitization, duration formatting), `src/focuslist/context.py` (`RequestContext`), and `src/focuslist/errors.py` (18 pinned `ErrorCode` enums and `ERROR_REGISTRY`).
+  4. **Platform Provider Boundary**: Isolated Google API clients to `src/focuslist/platform/live_provider.py` (FR-11.2). Implemented `FixtureVideoProvider` (reading synthetic offline datasets) and `FaultInjectionProvider` (for simulating timeouts, quota depletion, and transient 500/503 errors).
+  5. **CLI Administration**: Created `src/focuslist/cli.py` (Typer CLI) exposing `serve`, `doctor`, `quota`, `auth`, `purge`, and `record-fixtures` commands sharing identical provider/clock dependencies.
+  6. **Synthetic Test Datasets & Test Suite**: Added `sample_videos.json`, `sample_channels.json`, and `sample_categories.json` under `tests/fixtures/`. Added 33 unit, integration, and system tests passing across `tests/unit/`, `tests/integration/`, and `tests/system/`.
+  7. **ADR-001 & Documentation**: Authored `docs/adr/ADR-001-service-architecture-and-contracts.md` pinning architecture, error codes, and setup commands. Updated `README.md` and indexed ADR-001 in `brain/index.md`.
+
 ### 2026-11-24 · Commit C06: Requirements Milestone Closure and Stage 1 Review
 - **Author**: Ayush Patel (BT2024171)
 - **Commit Reference**: C06 (`docs(review): close the requirements milestone`)
@@ -46,6 +59,29 @@ This append-only log tracks additions, modifications, decision milestones, and s
 ---
 
 ## AI Session Records (SB-1, SB-5, SE-5)
+
+### Session C07-S01: Scaffold the Python MCP Service
+- **Date**: 2026-11-25 (IST)
+- **Teammate / Operator**: Aangir Doshi (BT2024078)
+- **AI Model**: Antigravity (Gemini 3.8 Flash High)
+- **Session Goals**:
+  1. Inspect C07 brief, AGENTS.md, Commit Plan, and SRS requirements (`UI-1–UI-5`, `COM-1–COM-6`, `FR-11`, `NFR-PORT`).
+  2. Implement package structure, CLI, FastMCP server, injectable clock seam, shared contracts, and error registry.
+  3. Implement `VideoProvider` abstraction, fixture provider, fault injection provider, and isolated live provider.
+  4. Provide synthetic test fixtures and comprehensive unit, integration, and system test suites.
+  5. Verify clean stdio protocol isolation, linter status, and zero secret leakage.
+  6. Document ADR-001, update README.md, update Second Brain log, and update Commit Plan completion line.
+- **Key Decisions & Resolutions**:
+  - Implemented FastMCP server stdio protocol with stdout strictly reserved for JSON-RPC frames; all diagnostic and logging output redirected to stderr (COM-1).
+  - Confined all Google API client imports (`googleapiclient`, `google.auth`) to `src/focuslist/platform/live_provider.py` (FR-11.2).
+  - Designed deterministic `FakeClock` seam for repeatable testing of timestamps, proposal expiration, and quota resets (NFR-PORT).
+  - Pinned 18 error codes in `src/focuslist/errors.py` with clear remediation advice and retryability flags (COM-5).
+  - Created offline synthetic fixtures with zero live account data or credentials (SEC-SECRETS, BR-9).
+- **Verification Performed**:
+  - `python -m ruff check .` passed with zero errors.
+  - `python -m pytest -v` executed and passed 33 tests across unit, integration, and system test modules.
+  - Subprocess script executed `focuslist.cli serve`, sent standard JSON-RPC `initialize` frame, and validated that stdout contained 100% protocol frames with zero log contamination.
+  - Secret scan confirmed no API keys or personal data committed.
 
 ### Session C04-S01: Second Brain Layout & Platform Research Notes
 - **Date**: 2026-11-20

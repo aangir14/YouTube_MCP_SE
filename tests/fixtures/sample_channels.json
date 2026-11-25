@@ -1,0 +1,28 @@
+[
+  {
+    "channel_id": "UCsyn_chan_001",
+    "canonical_url": "https://www.youtube.com/channel/UCsyn_chan_001",
+    "title": "Synthetic Tech Academy",
+    "handle": "@synthetic_tech",
+    "description": "High-quality software engineering tutorials and algorithms walkthroughs.",
+    "topic_categories": ["https://en.wikipedia.org/wiki/Computer_science"],
+    "subscriber_count": 45000,
+    "video_count": 120,
+    "recent_upload_ids": ["syn_vid_0001", "syn_vid_0002", "syn_vid_0005"],
+    "hidden_subscriber_count": false,
+    "untrusted": true
+  },
+  {
+    "channel_id": "UCsyn_chan_002",
+    "canonical_url": "https://www.youtube.com/channel/UCsyn_chan_002",
+    "title": "Algorithms Laboratory",
+    "handle": "@algorithms_lab",
+    "description": "Visualizing complex algorithms and data structures clearly.",
+    "topic_categories": ["https://en.wikipedia.org/wiki/Algorithm"],
+    "subscriber_count": 82000,
+    "video_count": 95,
+    "recent_upload_ids": ["syn_vid_0003", "syn_vid_0004"],
+    "hidden_subscriber_count": false,
+    "untrusted": true
+  }
+]

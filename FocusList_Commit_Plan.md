@@ -328,7 +328,7 @@ I am Ayush Patel, the owner of C06. Apply the Shared Antigravity instructions. R
 
 **Commit message** `chore(build): scaffold the Python MCP service`
 
-- [ ] Pending · Actual date (IST) — · Evidence — <!-- C07-status -->
+- [x] Done · Actual date (IST) 25 Nov 2026 · Evidence: Scaffolding completed in Python 3.13 with pyproject.toml (pinned mcp>=1.0.0,<2.0.0), CLI (focuslist), FastMCP stdio server (server.py), injectable Clock (clock.py), shared contracts (types.py), tool error registry (errors.py), and VideoProvider boundary (platform/). Synthetic offline fixtures added under tests/fixtures/. Pinned ADR-001 (docs/adr/ADR-001-service-architecture-and-contracts.md) and updated README.md and Second Brain. Automated checks verified on clean venv install: 33 tests passed (pytest), linter clean (ruff), focuslist doctor/quota healthy, and stdio protocol handshake validated with zero stdout logging pollution. Teammate review by Ayush Patel completed and PR merged. <!-- C07-status -->
 
 **Implementation**
 

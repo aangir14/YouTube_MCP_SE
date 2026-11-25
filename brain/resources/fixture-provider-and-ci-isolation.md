@@ -69,6 +69,7 @@ The `FixtureVideoProvider` implements the complete `VideoProvider` protocol usin
 ```python
 class FixtureVideoProvider(VideoProvider):
     """Deterministic offline provider reading from synthetic test datasets."""
+
     def __init__(self, fixture_dir: Path):
         self.fixture_dir = fixture_dir
         self.call_counts: dict[str, int] = defaultdict(int)
