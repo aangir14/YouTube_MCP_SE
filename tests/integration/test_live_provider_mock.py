@@ -8,6 +8,9 @@ from typing import Any
 import pytest
 from googleapiclient.errors import HttpError
 
+from focuslist.config import Settings
+from focuslist.context import RequestContext
+from focuslist.discovery.videos import VideoDiscovery
 from focuslist.errors import (
     AuthExpiredError,
     AuthRequiredError,
@@ -48,7 +51,8 @@ class _FakeEndpoint:
 
 
 class _FakeYouTubeService:
-    def __init__(self) -> None:
+    def __init__(self, channel_id: str = "UC_ch_001") -> None:
+        self.channel_id = channel_id
         self.video_calls: list[dict[str, Any]] = []
         self.search_calls: list[dict[str, Any]] = []
         self.channel_calls: list[dict[str, Any]] = []
@@ -86,7 +90,7 @@ class _FakeYouTubeService:
                         "id": vid,
                         "snippet": {
                             "title": f"Title \u200b{vid}",
-                            "channelId": "UC_ch_001",
+                            "channelId": self.channel_id,
                             "channelTitle": "Test Channel",
                             "description": "Structured lecture.",
                             "publishedAt": "2026-05-01T10:00:00Z",
@@ -132,7 +136,7 @@ class _FakeYouTubeService:
                 payload={
                     "items": [
                         {
-                            "id": "UC_ch_001",
+                            "id": self.channel_id,
                             "snippet": {
                                 "title": "Test Channel",
                                 "customUrl": "@testchan",
@@ -253,6 +257,25 @@ def test_live_provider_search_caps_pages_even_with_next_page_token() -> None:
     assert len(svc.video_calls) == 2
     assert len(results) == 75
     assert provider.network_attempts == 4
+
+
+def test_fr1_uses_two_search_pages_and_six_general_units_on_mock_transport() -> None:
+    service = _FakeYouTubeService(channel_id="UC" + "a" * 22)
+    provider = LiveVideoProvider(service=service)
+    discovery = VideoDiscovery(provider, RequestContext(settings=Settings(provider="live")))
+
+    response = discovery.tool_response(lambda: discovery.similar("seed_vid001", limit=50))
+
+    assert response["result"]["candidate_count"] == 101
+    assert response["result"]["eligible_count"] == 101
+    assert response["result"]["count"] == 50
+    assert response["meta"]["quota_used"] == 6
+    assert response["meta"]["search_calls"] == 2
+    assert [call["maxResults"] for call in service.search_calls] == [50, 50]
+    assert all("pageToken" not in call for call in service.search_calls)
+    assert len(service.channel_calls) == len(service.playlist_item_calls) == 1
+    assert [len(call["id"].split(",")) for call in service.video_calls] == [1, 50, 50, 1]
+    assert provider.network_attempts == 8
 
 
 def test_live_provider_channel_account_and_categories_parity() -> None:

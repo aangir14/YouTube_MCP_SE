@@ -1,6 +1,7 @@
 [
   {
     "video_id": "syn_vid0001",
+    "visibility": "public",
     "canonical_url": "https://www.youtube.com/watch?v=syn_vid0001",
     "title": "Recursion and Dynamic Programming in Python",
     "channel_id": "UCsyn_chan_0000000000001",
@@ -22,6 +23,7 @@
   },
   {
     "video_id": "syn_vid0002",
+    "visibility": "public",
     "canonical_url": "https://www.youtube.com/watch?v=syn_vid0002",
     "title": "Tree Traversal and Binary Search Trees",
     "channel_id": "UCsyn_chan_0000000000001",
@@ -43,6 +45,7 @@
   },
   {
     "video_id": "syn_vid0003",
+    "visibility": "public",
     "canonical_url": "https://www.youtube.com/watch?v=syn_vid0003",
     "title": "Divide and Conquer: Merge Sort Explained",
     "channel_id": "UCsyn_chan_0000000000002",
@@ -64,6 +67,7 @@
   },
   {
     "video_id": "syn_vid0004",
+    "visibility": "public",
     "canonical_url": "https://www.youtube.com/watch?v=syn_vid0004",
     "title": "Backtracking Fundamentals: The N-Queens Problem",
     "channel_id": "UCsyn_chan_0000000000002",
@@ -85,6 +89,7 @@
   },
   {
     "video_id": "syn_vid0005",
+    "visibility": "public",
     "canonical_url": "https://www.youtube.com/watch?v=syn_vid0005",
     "title": "Tail Call Optimization and Call Stack Analysis",
     "channel_id": "UCsyn_chan_0000000000001",

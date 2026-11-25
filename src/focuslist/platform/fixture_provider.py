@@ -100,6 +100,16 @@ class FixtureVideoProvider(VideoProvider):
 
     def search_candidates(self, query: str, max_results: int = 50) -> list[VideoRecord]:
         self._record_call("search_candidates", query=query, max_results=max_results)
+        return self._search_records(query, max_results)
+
+    def search_video_ids(self, query: str, max_results: int = 50) -> list[str]:
+        cap = min(50, max(0, max_results))
+        if not cap:
+            return []
+        self._record_call("search_video_ids", query=query, max_results=cap)
+        return [record.video_id for record in self._search_records(query, cap)]
+
+    def _search_records(self, query: str, max_results: int) -> list[VideoRecord]:
         q_lower = query.lower()
         ordered_videos = sorted(self._videos.values(), key=lambda v: v.video_id)
         matched: list[VideoRecord] = []
@@ -142,6 +152,15 @@ class FixtureVideoProvider(VideoProvider):
             key=lambda v: v.video_id,
         )
         return res[:max_results]
+
+    def get_channel_upload_ids(self, channel_id: str, max_results: int = 50) -> list[str]:
+        cap = min(50, max(0, max_results))
+        if not cap:
+            return []
+        self._record_call("get_channel_upload_ids", channel_id=channel_id, max_results=cap)
+        return sorted(
+            video.video_id for video in self._videos.values() if video.channel_id == channel_id
+        )[:cap]
 
     def get_user_likes(
         self,
