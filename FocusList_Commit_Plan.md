@@ -449,7 +449,7 @@ I am Harshil Srivastav, the owner of C11. Apply the Shared Antigravity instructi
 
 **Commit message** `feat(curation): establish playlist constraints and solver tests`
 
-- [ ] Pending · Actual date (IST) — · Evidence — <!-- C12-status -->
+- [x] Done · Actual date (IST) 2026-11-25 · Evidence: Implemented `src/focuslist/curation/constraints.py` (`PlaylistProposalRequest`, `ValidatedPlaylistConstraints`, `validate_proposal_arguments`) and `src/focuslist/curation/solver.py` (`solve_playlist`, `filter_eligible_candidates`, `score_candidates_fr5`, `greedy_baseline_select`) reusing C11 duration/language/ID parsers and C09 FR-5 weights. Documented DP vs greedy baseline and Stage 2 evidence in `docs/testing/curation-solver-baseline.md`. Verified offline: `python -m ruff check .` (All checks passed), `python -m pytest -q` (all unit/integration/system tests passed including 22 new curation tests and 250-case property harness). <!-- C12-status -->
 
 **Implementation**
 
