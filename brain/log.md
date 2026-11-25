@@ -133,3 +133,12 @@ This append-only log tracks additions, modifications, decision milestones, and s
 - **Verification:** A local PowerShell here-string piped to `python -` used PyYAML to parse all four frontmatter blocks. It checked added relative paths and Markdown anchors, verified the eight supporting-note rows and recalculated the worked duration and ranking examples. `git -c core.safecrlf=false diff --check` checked the tracked changes for whitespace errors. The new note files were checked for trailing whitespace by the Python check.
 - **Review:** Harshil reported teammate approval before publication. GitHub had no C05 pull request at the time.
 - **Pending evidence:** The fixture variants are specifications for future implementation. Authenticated YouTube calls, MCP fixture runs and ranking benchmarks were outside this session.
+
+### Session C08-S01: Discovery and Ranking Design
+
+- **Date:** 2026-11-25 (IST). **Teammate / operator:** Harshil Srivastav. **AI tool:** Codex.
+- **Assignment:** [C08](../FocusList_Commit_Plan.md#c08-define-ranking-and-evaluation-contracts). Compared the course brief and SRS with C02 acceptance cases, C05 evidence and C07's published scaffold at `6de612d`.
+- **Decisions and evidence:** Authored the [discovery and analytics ADR](../docs/adr/ADR-002-discovery-analytics-and-ranking-evaluation.md) and [paired ranking evaluation](../docs/testing/ranking-evaluation.md). Verified the 20 public YouTube IDs against their MIT OpenCourseWare lecture pages. Froze 19 candidates per seed and labelled all 380 directed pairs before the scoring checks.
+- **Verification:** A local PowerShell here-string piped to `python -` validated IDs, paths, anchors and judgement membership, then checked identical candidate sets, deterministic sorting in a standard-library reference calculation, the metric examples, UTC offsets and duration-bin edges. `git -c core.safecrlf=false diff --check` passed.
+- **Publication check:** The owner requested publication after C07 merged. The ADR uses the merged scaffold's identifier parameter names and documents the retained period shorthand and production source-selection requirement. Against merged `main`, `python -m pytest -q` passed all 33 tests with `FOCUSLIST_PROVIDER=fixture` in a fresh Python 3.12 environment with MCP 1.30.0. `python -m ruff check .` passed.
+- **Open evidence:** C07 interface gaps are documented in the ADR. Teammate PR review, product MCP checks and C26's measured ranking results remain pending.
