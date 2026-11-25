@@ -13,11 +13,11 @@ def test_fixture_provider_data_loading_and_determinism(
     fixture_provider: FixtureVideoProvider,
 ) -> None:
     """Verify FixtureVideoProvider loads synthetic dataset deterministically with call recording."""
-    videos_1 = fixture_provider.get_video_details(["syn_vid_0001", "syn_vid_0002"])
-    videos_2 = fixture_provider.get_video_details(["syn_vid_0001", "syn_vid_0002"])
+    videos_1 = fixture_provider.get_video_details(["syn_vid0001", "syn_vid0002"])
+    videos_2 = fixture_provider.get_video_details(["syn_vid0001", "syn_vid0002"])
     assert videos_1 == videos_2
     assert len(videos_1) == 2
-    assert videos_1[0].video_id == "syn_vid_0001"
+    assert videos_1[0].video_id == "syn_vid0001"
     assert "Recursion" in videos_1[0].title
     assert fixture_provider.call_counts["get_video_details"] == 2
     assert fixture_provider.requests == 2
@@ -48,7 +48,7 @@ def test_fixture_provider_playlist_lifecycle_and_write_counts(
     pid = fixture_provider.create_playlist("Test Playlist", "Description", privacy="private")
     assert pid.startswith("PL_syn_")
 
-    item_id = fixture_provider.insert_playlist_item(pid, "syn_vid_0001")
+    item_id = fixture_provider.insert_playlist_item(pid, "syn_vid0001")
     assert item_id.startswith("PLI_syn_")
 
     playlists = fixture_provider.get_user_playlists("acc_1")

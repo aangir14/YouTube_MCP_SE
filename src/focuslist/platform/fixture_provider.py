@@ -7,12 +7,12 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
+from focuslist.metadata import normalise_channel_record, normalise_video_record
 from focuslist.platform.provider import VideoProvider
 from focuslist.types import (
     AccountActivityRecord,
     ChannelRecord,
     VideoRecord,
-    sanitize_untrusted_text,
 )
 
 
@@ -74,9 +74,7 @@ class FixtureVideoProvider(VideoProvider):
             with open(videos_file, "r", encoding="utf-8") as f:
                 data = json.load(f)
                 for item in data:
-                    item["title"] = sanitize_untrusted_text(item.get("title", ""))
-                    item["description"] = sanitize_untrusted_text(item.get("description", ""))
-                    v = VideoRecord(**item)
+                    v = normalise_video_record(VideoRecord(**item))
                     self._videos[v.video_id] = v
 
         channels_file = self.fixture_dir / "sample_channels.json"
@@ -84,8 +82,7 @@ class FixtureVideoProvider(VideoProvider):
             with open(channels_file, "r", encoding="utf-8") as f:
                 data = json.load(f)
                 for item in data:
-                    item["title"] = sanitize_untrusted_text(item.get("title", ""))
-                    c = ChannelRecord(**item)
+                    c = normalise_channel_record(ChannelRecord(**item))
                     self._channels[c.channel_id] = c
 
         categories_file = self.fixture_dir / "sample_categories.json"
@@ -107,7 +104,7 @@ class FixtureVideoProvider(VideoProvider):
         ordered_videos = sorted(self._videos.values(), key=lambda v: v.video_id)
         matched: list[VideoRecord] = []
         for v in ordered_videos:
-            if q_lower in v.title.lower() or any(q_lower in tag.lower() for tag in v.tags):
+            if q_lower in v.title.lower() or any(q_lower in tag.lower() for tag in v.tags or ()):
                 matched.append(v)
             if len(matched) >= max_results:
                 break
@@ -125,14 +122,11 @@ class FixtureVideoProvider(VideoProvider):
         if channel_id and channel_id in self._channels:
             return self._channels[channel_id]
         if handle:
-            h_clean = handle.lstrip("@").lower()
+            h_clean = handle.lstrip("@").casefold()
             for cid in sorted(self._channels):
                 c = self._channels[cid]
-                if c.handle and c.handle.lstrip("@").lower() == h_clean:
+                if c.handle and c.handle.lstrip("@").casefold() == h_clean:
                     return c
-        # If any channel exists, return first deterministically as mock fallback
-        if self._channels:
-            return self._channels[min(self._channels)]
         return None
 
     def get_channel_recent_uploads(

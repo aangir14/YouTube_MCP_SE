@@ -12,10 +12,19 @@ from focuslist.clock import SystemClock
 from focuslist.config import Settings, get_settings
 from focuslist.context import RequestContext
 from focuslist.errors import (
+    ChannelUnavailableError,
     ErrorCode,
     FocusListError,
     InvalidArgumentsError,
-    InvalidVideoIdError,
+)
+from focuslist.metadata import (
+    normalise_language_tag,
+    normalise_video_record,
+    parse_channel_reference,
+    parse_duration_seconds,
+    parse_playlist_id,
+    parse_video_id,
+    video_watch_url,
 )
 from focuslist.platform import create_provider
 from focuslist.types import format_duration_display
@@ -56,40 +65,33 @@ def create_server(
     )
     def get_video_details(video_url_or_id: str) -> dict[str, Any]:
         """Fetch video metadata fact sheet (costs 1 general quota unit)."""
-        if not video_url_or_id or len(video_url_or_id.strip()) < 3:
-            return ctx.failure(
-                InvalidVideoIdError("Video URL or ID must not be empty.")
-            ).model_dump()
-
-        vid = video_url_or_id.strip()
-        if "v=" in vid:
-            vid = vid.split("v=")[1].split("&")[0]
-        elif "/" in vid:
-            vid = vid.rstrip("/").split("/")[-1]
+        try:
+            vid = parse_video_id(video_url_or_id)
+        except FocusListError as exc:
+            return ctx.failure(exc).model_dump()
 
         ctx.record_quota_charge(1)
         videos = provider.get_video_details([vid])
-        if not videos:
-            # Fallback to first available fixture video in fixture mode if specific ID not matched
-            cand = provider.search_candidates("", max_results=1)
-            video = cand[0] if cand else None
-        else:
-            video = videos[0]
-
-        if not video:
+        record = next((video for video in videos if video.video_id == vid), None)
+        if record is None or record.visibility == "private":
             return ctx.failure(
-                FocusListError(ErrorCode.VIDEO_UNAVAILABLE, f"Video {vid} unavailable.")
+                FocusListError(ErrorCode.VIDEO_UNAVAILABLE)
             ).model_dump()
 
+        video = normalise_video_record(record)
         return ctx.success(
             {
                 "video_id": video.video_id,
+                "canonical_url": video_watch_url(vid),
                 "title": video.title,
                 "channel_title": video.channel_title,
                 "channel_id": video.channel_id,
                 "duration": video.duration_display,
                 "duration_seconds": video.duration_seconds,
+                "duration_iso": video.duration_iso,
                 "description": video.description,
+                "language": video.language,
+                "language_provenance": video.language_provenance,
                 "view_count": video.view_count,
                 "like_count": video.like_count,
                 "published_at": video.published_at.isoformat() if video.published_at else None,
@@ -103,6 +105,11 @@ def create_server(
     )
     def similar_videos(video_url_or_id: str, limit: int = 10) -> dict[str, Any]:
         """Discover similar videos with component explanations (costs <=6 general units)."""
+        try:
+            seed_id = parse_video_id(video_url_or_id)
+        except FocusListError as exc:
+            return ctx.failure(exc).model_dump()
+
         if limit < 1 or limit > 50:
             return ctx.failure(
                 InvalidArgumentsError("Limit must be between 1 and 50.")
@@ -123,7 +130,7 @@ def create_server(
             for idx, v in enumerate(candidates[:limit])
         ]
         return ctx.success(
-            {"seed": video_url_or_id, "count": len(results), "videos": results}
+            {"seed": seed_id, "count": len(results), "videos": results}
         ).model_dump()
 
     @mcp.tool(
@@ -132,24 +139,31 @@ def create_server(
     )
     def similar_channels(channel_url_handle_or_id: str, limit: int = 10) -> dict[str, Any]:
         """Discover similar channels with topic relevance scores."""
+        try:
+            seed = parse_channel_reference(channel_url_handle_or_id)
+        except FocusListError as exc:
+            return ctx.failure(exc).model_dump()
+
         if limit < 1 or limit > 25:
             return ctx.failure(
                 InvalidArgumentsError("Limit must be between 1 and 25.")
             ).model_dump()
 
         ctx.record_quota_charge(25)
-        chan = provider.get_channel_details(handle=channel_url_handle_or_id)
+        chan = provider.get_channel_details(**seed.provider_arguments())
+        if chan is None:
+            return ctx.failure(ChannelUnavailableError()).model_dump()
         results = [
             {
-                "channel_id": chan.channel_id if chan else "UCsyn_chan_001",
-                "title": chan.title if chan else "Synthetic Tech Academy",
-                "handle": chan.handle if chan else "@synthetic_tech",
+                "channel_id": chan.channel_id,
+                "title": chan.title,
+                "handle": chan.handle,
                 "score": 0.88,
                 "rank": 1,
                 "reason": "Shared Computer Science topic categories and high upload overlap.",
             }
         ]
-        return ctx.success({"seed": channel_url_handle_or_id, "channels": results}).model_dump()
+        return ctx.success({"seed": chan.channel_id, "channels": results}).model_dump()
 
     # ==========================================================================
     # Personalization & Analytics Tools (SRS FR-3, FR-4)
@@ -227,9 +241,21 @@ def create_server(
         if not topic or len(topic.strip()) < 1:
             return ctx.failure(InvalidArgumentsError("Topic must not be empty.")).model_dump()
 
+        try:
+            parse_duration_seconds(target_duration, allow_zero=False)
+            parse_duration_seconds(max_item_duration, allow_zero=False)
+        except FocusListError as exc:
+            return ctx.failure(exc).model_dump()
+        normalised_language = normalise_language_tag(language)
+        if normalised_language is None:
+            return ctx.failure(
+                InvalidArgumentsError("Provide a known BCP 47 language tag, such as en.")
+            ).model_dump()
+
         ctx.record_quota_charge(15)
         candidates = provider.search_candidates(topic, max_results=min(item_limit, 5))
-        total_secs = sum(c.duration_seconds for c in candidates)
+        candidates = [candidate for candidate in candidates if candidate.duration_seconds is not None]
+        total_secs = sum(c.duration_seconds for c in candidates if c.duration_seconds is not None)
         items = [
             {
                 "order": idx + 1,
@@ -248,7 +274,7 @@ def create_server(
                 "proposal_id": proposal_id,
                 "title": f"Study Session: {topic.title()}",
                 "topic": topic,
-                "language": language,
+                "language": normalised_language,
                 "item_count": len(items),
                 "total_duration": format_duration_display(total_secs),
                 "total_duration_seconds": total_secs,
@@ -278,8 +304,8 @@ def create_server(
             description="Created by FocusList MCP Server following learner confirmation.",
             privacy="private",
         )
-        provider.insert_playlist_item(pid, "syn_vid_0001", position=0)
-        provider.insert_playlist_item(pid, "syn_vid_0002", position=1)
+        provider.insert_playlist_item(pid, "syn_vid0001", position=0)
+        provider.insert_playlist_item(pid, "syn_vid0002", position=1)
 
         return ctx.success(
             {
@@ -321,10 +347,15 @@ def create_server(
     )
     def analyse_playlist(playlist_url_or_id: str) -> dict[str, Any]:
         """Analyze playlist duration metrics, channel shares, and categories."""
+        try:
+            playlist_id = parse_playlist_id(playlist_url_or_id)
+        except FocusListError as exc:
+            return ctx.failure(exc).model_dump()
+
         ctx.record_quota_charge(3)
         return ctx.success(
             {
-                "playlist_id": playlist_url_or_id,
+                "playlist_id": playlist_id,
                 "total_items": 5,
                 "total_duration": "1:16:00",
                 "languages": ["en"],
@@ -341,10 +372,15 @@ def create_server(
         playlist_url_or_id: str, max_item_length_minutes: int | None = None
     ) -> dict[str, Any]:
         """Audit playlist health and identify flagged items."""
+        try:
+            playlist_id = parse_playlist_id(playlist_url_or_id)
+        except FocusListError as exc:
+            return ctx.failure(exc).model_dump()
+
         ctx.record_quota_charge(3)
         return ctx.success(
             {
-                "playlist_id": playlist_url_or_id,
+                "playlist_id": playlist_id,
                 "total_items_scanned": 5,
                 "flagged_count": 0,
                 "issues": [],

@@ -425,7 +425,7 @@ I am Aangir Doshi, the owner of C10. Apply the Shared Antigravity instructions. 
 
 **Commit message** `feat(metadata): validate identifiers and normalise durations`
 
-- [ ] Pending · Actual date (IST) — · Evidence — <!-- C11-status -->
+- [ ] In progress · Actual date (IST) 2026-11-25 · Evidence: [Metadata contract and caller guide](docs/development/metadata-normalisation.md). Implemented identifier, duration, UTC and primary-language parsing plus sparse C07 record normalization. Fixture MCP tests verified malformed inputs cause zero provider requests, outbound attempts, writes or quota charges. Full fixture suite: 145 passed. Ruff and diff checks passed. [Verification and C08–C10 audit](brain/log.md#session-c11-s01-shared-metadata-normalisation). Owner and teammate review pending. <!-- C11-status -->
 
 **Implementation**
 
