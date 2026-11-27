@@ -29,6 +29,7 @@ from focuslist.metadata import (
     same_primary_language,
     video_watch_url,
 )
+from focuslist.platform.gateway import ProviderGateway
 from focuslist.platform.provider import VideoProvider
 from focuslist.types import VideoRecord
 
@@ -275,6 +276,7 @@ class VideoDiscovery:
         """Serialize FR-1 admission against the process-local C07 counters."""
         with self._lock:
             before_units, before_searches = self.ctx.quota_used, self.search_calls_used
+            before_hits = self.ctx.cache_hits
             try:
                 result = operation()
             except FocusListError as exc:
@@ -283,9 +285,12 @@ class VideoDiscovery:
                 payload = self.ctx.success(result).model_dump()
             payload["meta"]["quota_used"] = self.ctx.quota_used - before_units
             payload["meta"]["search_calls"] = self.search_calls_used - before_searches
+            payload["meta"]["cache_hits"] = self.ctx.cache_hits - before_hits
             return payload
 
     def _preflight(self, general: int, searches: int = 0) -> None:
+        if isinstance(self.provider, ProviderGateway):
+            return
         settings = self.ctx.settings
         available = (
             settings.daily_general_quota
@@ -300,14 +305,22 @@ class VideoDiscovery:
 
     def _read(self, operation: Callable[[], _T], *, search: bool = False) -> _T:
         before = self.provider.network_attempts
+        before_hits = getattr(self.provider, "cache_hits", 0)
         try:
             return operation()
         finally:
             attempts = self.provider.network_attempts - before
+            hits = getattr(self.provider, "cache_hits", 0) - before_hits
+            if hits > 0:
+                self.ctx.record_cache_hit(hits)
             if search:
                 self.search_calls_used += attempts
             else:
                 self.ctx.record_quota_charge(attempts)
+            if isinstance(self.provider, ProviderGateway):
+                self.ctx.set_quota_remaining(
+                    self.provider.quota_manager.get_status().general_units_remaining
+                )
 
     def _seed(self, video_id: str) -> VideoRecord:
         records = self._read(lambda: self.provider.get_video_details([video_id]))
@@ -318,8 +331,12 @@ class VideoDiscovery:
 
     def details(self, reference: str) -> dict[str, Any]:
         video_id = parse_video_id(reference)
-        self._preflight(1)
-        video = self._seed(video_id)
+        if isinstance(self.provider, ProviderGateway):
+            with self.provider.operation_budget(1, 0):
+                video = self._seed(video_id)
+        else:
+            self._preflight(1)
+            video = self._seed(video_id)
         facts = {
             "description": video.description,
             "tags": video.tags,
@@ -340,59 +357,69 @@ class VideoDiscovery:
         video_id = parse_video_id(reference)
         if type(limit) is not int or not 1 <= limit <= 50:
             raise InvalidArgumentsError("Limit must be an integer between 1 and 50.")
-        self._preflight(_GENERAL_CAP, _SEARCH_CAP)
-        seed = self._seed(video_id)
 
-        pages = []
-        for query in _search_queries(seed):
-            pages.append(
-                self._read(
-                    partial(self.provider.search_video_ids, query, max_results=_PAGE), search=True
+        def _run_similar() -> dict[str, Any]:
+            seed = self._seed(video_id)
+
+            pages = []
+            for query in _search_queries(seed):
+                pages.append(
+                    self._read(
+                        partial(self.provider.search_video_ids, query, max_results=_PAGE),
+                        search=True,
+                    )
                 )
-            )
 
-        warnings = []
-        try:
-            channel = parse_channel_reference(seed.channel_id)
-        except InvalidChannelIdError:
-            warnings.append("The seed channel is unknown, so its uploads were skipped.")
-        else:
-            if channel.kind == "id":
-                try:
-                    pages.append(
-                        self._read(
-                            lambda: self.provider.get_channel_upload_ids(
-                                channel.value, max_results=_PAGE
+            warnings = []
+            try:
+                channel = parse_channel_reference(seed.channel_id)
+            except InvalidChannelIdError:
+                warnings.append("The seed channel is unknown, so its uploads were skipped.")
+            else:
+                if channel.kind == "id":
+                    try:
+                        pages.append(
+                            self._read(
+                                lambda: self.provider.get_channel_upload_ids(
+                                    channel.value, max_results=_PAGE
+                                )
                             )
                         )
+                    except ChannelUnavailableError:
+                        warnings.append("The seed channel uploads were unavailable.")
+                else:
+                    warnings.append(
+                        "The seed channel has no canonical ID, so its uploads were skipped."
                     )
-                except ChannelUnavailableError:
-                    warnings.append("The seed channel uploads were unavailable.")
-            else:
-                warnings.append(
-                    "The seed channel has no canonical ID, so its uploads were skipped."
-                )
 
-        ids = _candidate_ids(video_id, pages)
-        candidates: dict[str, VideoRecord] = {}
-        for offset in range(0, len(ids), _PAGE):
-            batch = ids[offset : offset + _PAGE]
-            records = self._read(partial(self.provider.get_video_details, batch))
-            for record in records:
-                if record.video_id in batch and record.video_id not in candidates:
-                    video = normalise_video_record(record)
-                    if _eligible(video):
-                        candidates[video.video_id] = video
-        results = rank_similar_videos(seed, list(candidates.values()))[:limit]
-        if not results:
-            warnings.append("No eligible videos were found within the search bounds.")
-        if any(item["missing_fields"] or item["low_confidence"] for item in results):
-            warnings.append("Some scores use limited metadata. See each item's missing fields.")
-        return {
-            "seed": video_id,
-            "count": len(results),
-            "candidate_count": len(ids),
-            "eligible_count": len(candidates),
-            "videos": results,
-            "warnings": warnings,
-        }
+            ids = _candidate_ids(video_id, pages)
+            candidates: dict[str, VideoRecord] = {}
+            for offset in range(0, len(ids), _PAGE):
+                batch = ids[offset : offset + _PAGE]
+                records = self._read(partial(self.provider.get_video_details, batch))
+                for record in records:
+                    if record.video_id in batch and record.video_id not in candidates:
+                        video = normalise_video_record(record)
+                        if _eligible(video):
+                            candidates[video.video_id] = video
+            results = rank_similar_videos(seed, list(candidates.values()))[:limit]
+            if not results:
+                warnings.append("No eligible videos were found within the search bounds.")
+            if any(item["missing_fields"] or item["low_confidence"] for item in results):
+                warnings.append(
+                    "Some scores use limited metadata. See each item's missing fields."
+                )
+            return {
+                "seed": video_id,
+                "count": len(results),
+                "candidate_count": len(ids),
+                "eligible_count": len(candidates),
+                "videos": results,
+                "warnings": warnings,
+            }
+
+        if isinstance(self.provider, ProviderGateway):
+            with self.provider.operation_budget(_GENERAL_CAP, _SEARCH_CAP):
+                return _run_similar()
+        self._preflight(_GENERAL_CAP, _SEARCH_CAP)
+        return _run_similar()

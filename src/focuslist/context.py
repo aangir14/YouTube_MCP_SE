@@ -26,12 +26,22 @@ class RequestContext:
         self.account_id = account_id
         self.request_id = request_id or str(uuid.uuid4())
         self.quota_used = 0
+        self.search_calls_used = 0
         self.cache_hits = 0
         self.warnings: list[str] = []
+        self._quota_remaining_override: int | None = None
 
     def record_quota_charge(self, units: int) -> None:
         """Record outbound quota units consumed during this operation."""
         self.quota_used += units
+
+    def record_search_charge(self, calls: int) -> None:
+        """Record outbound search calls consumed during this operation."""
+        self.search_calls_used += calls
+
+    def set_quota_remaining(self, remaining: int) -> None:
+        """Synchronize remaining daily balance from the local SQLite quota ledger."""
+        self._quota_remaining_override = max(0, remaining)
 
     def record_cache_hit(self, count: int = 1) -> None:
         """Record cache hits that incurred zero quota."""
@@ -43,7 +53,10 @@ class RequestContext:
 
     def create_meta_envelope(self) -> MetaEnvelope:
         """Produce the MetaEnvelope snapshot for the current request context."""
-        remaining = max(0, self.settings.daily_general_quota - self.quota_used)
+        if self._quota_remaining_override is not None:
+            remaining = self._quota_remaining_override
+        else:
+            remaining = max(0, self.settings.daily_general_quota - self.quota_used)
         return MetaEnvelope(
             quota_used=self.quota_used,
             quota_remaining=remaining,

@@ -48,6 +48,6 @@ if __name__ == "__main__":
     fixture_dir, evidence = map(Path, sys.argv[1:])
     provider = ObservedFixture(fixture_dir, evidence)
     server.create_provider = lambda settings: provider
-    server.create_server(settings=Settings(provider="fixture", fixture_dir=fixture_dir)).run(
-        transport="stdio"
-    )
+    server.create_server(
+        settings=Settings(provider="fixture", fixture_dir=fixture_dir, cache_enabled=False)
+    ).run(transport="stdio")

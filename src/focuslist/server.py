@@ -16,6 +16,8 @@ from focuslist.curation import propose_playlist_action
 from focuslist.discovery.videos import VideoDiscovery
 from focuslist.errors import (
     ChannelUnavailableError,
+    ConfirmationExpiredError,
+    ConfirmationInvalidError,
     FocusListError,
     InvalidArgumentsError,
 )
@@ -24,6 +26,10 @@ from focuslist.metadata import (
     parse_playlist_id,
 )
 from focuslist.platform import create_provider
+from focuslist.platform.auth import AuthManager, SecretRedactingFilter
+from focuslist.platform.gateway import ProviderGateway
+from focuslist.platform.quota import QuotaManager, estimate_operation_cost
+from focuslist.platform.storage import FocusListStorage
 
 # Stdio Hygiene: ensure diagnostics and internal logs route exclusively to stderr
 logging.basicConfig(
@@ -32,6 +38,7 @@ logging.basicConfig(
     format="[%(asctime)s] [%(levelname)s] [focuslist] %(message)s",
 )
 logger = logging.getLogger("focuslist.server")
+logging.getLogger("focuslist").addFilter(SecretRedactingFilter())
 
 
 def create_server(
@@ -41,7 +48,25 @@ def create_server(
     """Instantiate and configure the FastMCP FocusList server with all tools and resources."""
     cfg = settings or get_settings()
     ctx = context or RequestContext(settings=cfg, clock=SystemClock())
-    provider = create_provider(settings=cfg)
+    storage = FocusListStorage(cfg.db_path, clock=ctx.clock)
+    quota_manager = QuotaManager(storage=storage, settings=cfg, clock=ctx.clock)
+    auth_manager = AuthManager(settings=cfg, storage=storage, clock=ctx.clock)
+
+    raw_provider = create_provider(settings=cfg)
+    if hasattr(raw_provider, "_auth_manager") and raw_provider._auth_manager is None:
+        raw_provider._auth_manager = auth_manager
+    provider = (
+        raw_provider
+        if isinstance(raw_provider, ProviderGateway)
+        else ProviderGateway(
+            raw_provider,
+            storage=storage,
+            quota_manager=quota_manager,
+            settings=cfg,
+            clock=ctx.clock,
+            cache_enabled=cfg.cache_enabled,
+        )
+    )
     video_discovery = VideoDiscovery(provider, ctx)
 
     mcp = FastMCP(
@@ -202,38 +227,67 @@ def create_server(
             "seed": seed,
             "session_minutes": session_minutes,
         }
-        return propose_playlist_action(raw_args, provider=provider, context=ctx)
+        return propose_playlist_action(
+            raw_args,
+            provider=provider,
+            context=ctx,
+            quota_manager=quota_manager,
+        )
 
     @mcp.tool(
         name="confirm_playlist",
         description="Confirm and execute an approved playlist creation action using proposal ID and token.",
     )
     def confirm_playlist(proposal_id: str, token: str) -> dict[str, Any]:
-        """Execute approved playlist write after explicit human confirmation."""
-        if not proposal_id or not token:
+        """Guarded confirmation gate: fails closed until C18 connects verified approval.
+
+        Guarantees zero provider writes and zero live dispatch on missing, placeholder,
+        unsigned, tampered, expired, or unapproved confirmation inputs.
+        """
+        if not isinstance(proposal_id, str) or not proposal_id.strip():
+            return ctx.failure(
+                InvalidArgumentsError("Both proposal_id and token are required.")
+            ).model_dump()
+        if not isinstance(token, str) or not token.strip():
             return ctx.failure(
                 InvalidArgumentsError("Both proposal_id and token are required.")
             ).model_dump()
 
-        # In fixture mode, simulate playlist creation and return playlist ID
-        ctx.record_quota_charge(151)
-        pid = provider.create_playlist(
-            title="Study Session: Dynamic Programming",
-            description="Created by FocusList MCP Server following learner confirmation.",
-            privacy="private",
-        )
-        provider.insert_playlist_item(pid, "syn_vid0001", position=0)
-        provider.insert_playlist_item(pid, "syn_vid0002", position=1)
+        clean_id = proposal_id.strip()
+        clean_token = token.strip()
+        stored = storage.get_proposal(clean_id)
+        if stored is not None and (
+            stored.state == "expired" or ctx.clock.now_epoch() > stored.expires_at
+        ):
+            storage.append_action_history(
+                proposal_id=clean_id,
+                proposal_hash=stored.canonical_hash,
+                action_kind="confirm_rejected",
+                account_id=ctx.account_id or stored.owner_account_id,
+                outcome="expired",
+                failed_step_code="CONFIRMATION_EXPIRED",
+            )
+            return ctx.failure(ConfirmationExpiredError()).model_dump()
 
-        return ctx.success(
-            {
-                "status": "CREATED",
-                "playlist_id": pid,
-                "playlist_url": f"https://www.youtube.com/playlist?list={pid}",
-                "items_inserted": 2,
-                "privacy": "private",
-                "message": "Playlist created successfully under private visibility.",
-            }
+        # Fail closed on placeholder, unsigned, tampered, or unverified tokens (zero writes)
+        if clean_token.startswith("pending_c21_hmac_signing:") or "mock" in clean_token.lower():
+            reason = "placeholder_or_unsigned_token"
+        else:
+            reason = "verified_approval_gate_pending_c18"
+
+        storage.append_action_history(
+            proposal_id=clean_id,
+            proposal_hash=stored.canonical_hash if stored else "unknown",
+            action_kind="confirm_rejected",
+            account_id=ctx.account_id or "anonymous",
+            outcome="rejected_zero_writes",
+            failed_step_code="CONFIRMATION_INVALID",
+        )
+        return ctx.failure(
+            ConfirmationInvalidError(
+                "Confirmation rejected: verified signed approval is required before any YouTube write.",
+                details={"reason": reason, "writes_executed": 0},
+            )
         ).model_dump()
 
     @mcp.tool(
@@ -241,18 +295,27 @@ def create_server(
         description="Propose deletion of a FocusList-created playlist within the 30-day retention window.",
     )
     def undo_playlist(playlist_id: str) -> dict[str, Any]:
-        """Propose undo/deletion of an owned playlist."""
-        if not playlist_id.startswith("PL"):
-            return ctx.failure(InvalidArgumentsError("Invalid playlist ID format.")).model_dump()
+        """Guarded undo route: validates eligibility locally with zero writes and no mock tokens."""
+        try:
+            clean_pid = parse_playlist_id(playlist_id)
+        except FocusListError as exc:
+            return ctx.failure(exc).model_dump()
 
-        return ctx.success(
-            {
-                "action": "undo_proposal",
-                "target_playlist_id": playlist_id,
-                "estimated_cost": 50,
-                "token": "undo_token_hmac_mock",
-                "message": "To confirm deletion of this playlist, submit confirmation with the undo token.",
-            }
+        owner = ctx.account_id or "fixture"
+        if not storage.is_playlist_undo_eligible(clean_pid, owner):
+            return ctx.failure(
+                InvalidArgumentsError(
+                    "Only FocusList-created playlists within the 30-day retention window "
+                    "are eligible for undo.",
+                    details={"reason": "undo_ineligible", "writes_executed": 0},
+                )
+            ).model_dump()
+
+        return ctx.failure(
+            ConfirmationInvalidError(
+                "Signed undo confirmation workflow is pending C18 integration.",
+                details={"reason": "verified_approval_gate_pending_c18", "writes_executed": 0},
+            )
         ).model_dump()
 
     # ==========================================================================
@@ -317,52 +380,37 @@ def create_server(
     )
     def estimate_quota(target_tool: str, arguments: dict[str, Any] | None = None) -> dict[str, Any]:
         """Local dry run estimation without any external network calls."""
-        cost_map = {
-            "get_video_details": (1, 0),
-            "similar_videos": (6, 2),
-            "similar_channels": (25, 3),
-            "recommend_videos": (40, 3),
-            "analyse_engagement": (60, 0),
-            "propose_playlist": (15, 3),
-            "confirm_playlist": (651, 0),
-            "undo_playlist": (50, 0),
-            "analyse_playlist": (3, 0),
-            "audit_playlist": (3, 0),
-            "estimate_quota": (0, 0),
-            "get_quota_status": (0, 0),
-            "auth_status": (0, 0),
-        }
-        units, searches = cost_map.get(target_tool, (10, 1))
-        return ctx.success(
-            {
-                "target_tool": target_tool,
-                "estimated_general_units": units,
-                "estimated_search_calls": searches,
-                "feasible": units <= ctx.settings.request_unit_cap,
-                "cache_hit_possible": True,
-            }
-        ).model_dump()
+        before_u = ctx.quota_used
+        try:
+            est = estimate_operation_cost(
+                target_tool,
+                arguments,
+                settings=cfg,
+                quota_manager=quota_manager,
+                storage=storage if cfg.cache_enabled else None,
+            )
+        except FocusListError as exc:
+            resp = ctx.failure(exc).model_dump()
+            resp["meta"]["quota_used"] = 0
+            return resp
+        ctx.set_quota_remaining(quota_manager.get_status().general_units_remaining)
+        resp = ctx.success(est.to_tool_dict()).model_dump()
+        resp["meta"]["quota_used"] = 0
+        _ = before_u
+        return resp
 
     @mcp.tool(
         name="get_quota_status",
         description="Inspect the local quota ledger: general units and search calls remaining today.",
     )
     def get_quota_status() -> dict[str, Any]:
-        """Return local quota accounting ledger status."""
-        return ctx.success(
-            {
-                "pacific_date": ctx.clock.now().strftime("%Y-%m-%d"),
-                "general_units_used": ctx.quota_used,
-                "general_units_remaining": max(
-                    0, ctx.settings.daily_general_quota - ctx.quota_used
-                ),
-                "search_calls_used": 0,
-                "search_calls_remaining": ctx.settings.daily_search_quota,
-                "cache_hits": ctx.cache_hits,
-                "is_exhausted": False,
-                "rollover_schedule": "Midnight Pacific Time (America/Los_Angeles)",
-            }
-        ).model_dump()
+        """Return local quota accounting ledger status with zero network calls."""
+        snap = quota_manager.get_status()
+        ctx.set_quota_remaining(snap.general_units_remaining)
+        resp = ctx.success(snap.to_tool_dict()).model_dump()
+        resp["meta"]["quota_used"] = 0
+        resp["meta"]["cache_hits"] = snap.cache_hits
+        return resp
 
     @mcp.tool(
         name="auth_status",
@@ -370,16 +418,10 @@ def create_server(
     )
     def auth_status() -> dict[str, Any]:
         """Report authorization state without exposing token values (SRS FR-9.5, FR-9.6)."""
-        return ctx.success(
-            {
-                "authenticated": ctx.settings.provider == "fixture",
-                "provider_mode": ctx.settings.provider,
-                "scopes": ["https://www.googleapis.com/auth/youtube.readonly"],
-                "token_age_days": 1,
-                "testing_mode_warning": False,
-                "notice": "Credentials stored securely in OS credential store / protected user file.",
-            }
-        ).model_dump()
+        snap = auth_manager.get_status()
+        resp = ctx.success(snap.to_tool_dict()).model_dump()
+        resp["meta"]["quota_used"] = 0
+        return resp
 
     # ==========================================================================
     # Resources (SRS Section 2, Section 4.6)
@@ -401,11 +443,14 @@ def create_server(
     @mcp.resource("focuslist://quota/status")
     def get_quota_resource() -> str:
         """Plaintext quota ledger resource."""
+        snap = quota_manager.get_status()
         return (
-            f"Pacific Date: {ctx.clock.now().strftime('%Y-%m-%d')}\n"
-            f"General Units Used: {ctx.quota_used} / {ctx.settings.daily_general_quota}\n"
-            f"Search Calls Used: 0 / {ctx.settings.daily_search_quota}\n"
-            f"Cache Hits: {ctx.cache_hits}\n"
+            f"Pacific Date: {snap.pacific_date}\n"
+            f"General Units Used: {snap.general_units_used} / {snap.daily_general_limit}\n"
+            f"Effective Remaining (5% safety margin): {snap.effective_general_remaining}\n"
+            f"Search Calls Used: {snap.search_calls_used} / {snap.daily_search_limit}\n"
+            f"Cache Hits: {snap.cache_hits}\n"
+            f"Next Pacific Reset (UTC): {snap.reset_time_utc.isoformat()}\n"
         )
 
     # ==========================================================================

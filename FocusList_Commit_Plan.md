@@ -27,7 +27,7 @@ Report what you changed, which requirements the changes satisfy, the exact comma
 - Put the code, test or documentation work and that one status edit in the same planned commit. Keep the intended date as a target. Record the actual date with no backdating. If a target date has already passed and the entry is incomplete, before starting use a new real work date and coordinate any dependent changes. Use the team calendar for stage deadlines once confirmed (TBD-1).
 - Work from an up-to-date base on a short-lived branch such as `c14/similar-videos`. Same-day dependencies listed under a commit must be available when the dependent work is verified. When updating the plan in two branches, keep both completion lines during conflict resolution.
 - Use a standalone GitHub repo with `main` as the default branch and all three teammates as named collaborators. Each owner configures their own GitHub-linked email or GitHub `noreply` address in their clone and checks the author and timestamp with `git log -1 --format=fuller`. Open a PR with the commit ID, SRS IDs, evidence and any significant AI-session note. All PRs need another teammate's review. FR-7 and FR-9 code changes need both teammates to review.
-- Use **Create a merge commit** so the authored commits stay in default-branch history. The timeline counts 36 authored commits and excludes Git-generated merge commits. GitHub assigns qualifying profile contributions to the author date. Check the author's profile link on the commit page after merge. For private repositories, reviewers need access to see the commits. Each teammate can show private contribution counts on their profile. [GitHub profile contribution rules](https://docs.github.com/en/account-and-profile/reference/profile-contributions-reference) · [Missing contributions](https://docs.github.com/en/account-and-profile/how-tos/contribution-settings/troubleshooting-missing-contributions)
+- Use **Create a merge commit** so the authored commits stay in default-branch history. The timeline counts 22 planned authored commits and excludes Git-generated merge commits. GitHub assigns qualifying profile contributions to the author date. Check the author's profile link on the commit page after merge. For private repositories, reviewers need access to see the commits. Each teammate can show private contribution counts on their profile. [GitHub profile contribution rules](https://docs.github.com/en/account-and-profile/reference/profile-contributions-reference) · [Missing contributions](https://docs.github.com/en/account-and-profile/how-tos/contribution-settings/troubleshooting-missing-contributions)
 
 ## Implementation plan
 
@@ -69,15 +69,15 @@ These are implementation conventions. C07–C12 pin the concrete field names, to
 
 | Public tool | Inputs and response | Implementation |
 | --- | --- | --- |
-| `get_video_details`, `similar_videos` | Video URL or ID; optional limit for similarity. Fact sheet or ranked videos. | C14, C26 for shared explanations |
-| `similar_channels` | Channel URL, handle or ID and optional limit. Ranked channels. | C17, C26 |
-| `recommend_videos` | Authorised sources and optional topic. Ranked videos with reasons. | C20, C26 |
-| `analyse_engagement` | Authorised sources, period, optional comparison and week/month grouping. Metrics, chart data and short summary. | C23 |
-| `propose_playlist` | Topic, target duration, maximum item duration and optional language, minimum duration, tolerance, item limit, seed, ordering, title, privacy or session length. Proposal, cost and confirmation token for a valid action. | C12, C15, C18, C21 |
-| `confirm_playlist` | Proposal ID and token from the reviewed action. Created, partial, resumed, undone or the previously recorded successful result. | C21, C24, C27, C30 |
-| `undo_playlist` | A FocusList-created playlist ID. Returns a deletion proposal for separate confirmation. | C30 |
-| `analyse_playlist`, `audit_playlist` | Playlist URL or ID and applicable thresholds. Summary or flagged items. | C29 |
-| `estimate_quota`, `get_quota_status`, `auth_status` | Tool plus its validated arguments for estimate. No arguments for status tools. Return local cost, budget or authorised state. | C19, C22 |
+| `get_video_details`, `similar_videos` | Video URL or ID; optional limit for similarity. Fact sheet or ranked videos. | C14, C19 for shared explanations |
+| `similar_channels` | Channel URL, handle or ID and optional limit. Ranked channels. | C17, C19 |
+| `recommend_videos` | Authorised sources and optional topic. Ranked videos with reasons. | C17, C19 |
+| `analyse_engagement` | Authorised sources, period, optional comparison and week/month grouping. Metrics, chart data and short summary. | C17 |
+| `propose_playlist` | Topic, target duration, maximum item duration and optional language, minimum duration, tolerance, item limit, seed, ordering, title, privacy or session length. Proposal, cost and confirmation token for a valid action. | C12, C15, C18 |
+| `confirm_playlist` | Proposal ID and token from the reviewed action. Created, partial, resumed, undone or the previously recorded successful result. | C18 |
+| `undo_playlist` | A FocusList-created playlist ID. Returns a deletion proposal for separate confirmation. | C18 |
+| `analyse_playlist`, `audit_playlist` | Playlist URL or ID and applicable thresholds. Summary or flagged items. | C19 |
+| `estimate_quota`, `get_quota_status`, `auth_status` | Tool plus its validated arguments for estimate. No arguments for status tools. Return local cost, budget or authorised state. | C16 |
 
 Expose resources for quota, current scoring weights (`focuslist://config/scoring`), proposals, generated tool reference and skill text. Keep proposal data local to the intended learner context. Expose MCP prompts for `video-to-playlist` and `playlist-audit`. Keep CLI commands aligned with SRS UI-2 to UI-3, including `auth login/status/logout`, `serve`, `doctor`, `quota`, `purge` and developer-only `record-fixtures`. Give commands help, nonzero failure exits and actionable messages.
 
@@ -116,7 +116,7 @@ Appendix B example for 12 items uses three searches and three general units for 
 - **FR-2.** Resolve supported URLs, IDs and handles. Return a remediation hint for legacy `/c/` URLs. Compare the seed profile using metadata and up to 20 recent uploads. Search at most three times, dedupe up to 100 candidates and exclude the seed. Use text cosine, topic, language and channel size with weights `0.60, 0.20, 0.10, 0.10`. Rerank the top 10 with recent uploads and stay within provider budgets. Exclude inaccessible channels and channels without public uploads. Flag hidden counts and missing keywords. Default 10, maximum 25.
 - **FR-3.** Load selected authorised inputs up to 200 likes, 200 subscriptions and five playlists with at most 100 items each. Derive a compact profile from text, category, length and language. Gather candidates across at most three searches and recent uploads from at most five relevant subscribed channels. Exclude liked videos and loaded playlist items. Score similarity, freshness, duration fit and channel affinity with `0.60, 0.15, 0.15, 0.10`. Cite up to three contributing items or channels, disclose the lack of watch-history input, and handle `AUTH_REQUIRED` and `NO_PROFILE_DATA`. Cache account-derived profiles only for the allowed TTL and purge them with the source data.
 - **FR-4.** Support 30/90/365-day and explicit periods, a second comparison period and weekly/monthly buckets. Report counts and shares for top channels and named categories, trends, counts per source, mean and median duration and histogram cutoffs at 5, 10, 20, 40 and 60 minutes. Document bin edges, UTC boundaries and multi-source counting in the response contract. Use genuine like/add timestamps when available. Disclose publication-date fallback where used. Calculate absolute and percentage changes, with null percentage against zero or empty baseline. For fewer than ten items return available metrics and a warning. Keep search usage zero and general units ≤60.
-- **FR-6 and evaluation.** Make scoring weights named and configurable. A pure scoring function emits raw values, weights and contributions whose sum matches within `0.000001`, missing field names with low-confidence flags and a deterministic reason of ≤200 characters. Use up to five shared TF-IDF terms. Lock exact feature scaling, missing-data and tie policies in C08/C26 ADRs. Use the same fixed candidate sets for TF-IDF baseline and weighted ranking. Record precision@5 and mean reciprocal rank over at least 20 public seeds, with the provisional `0.60` target recorded under TBD-4. Report observed values without tuning solely to disguise misses.
+- **FR-6 and evaluation.** Make scoring weights named and configurable. A pure scoring function emits raw values, weights and contributions whose sum matches within `0.000001`, missing field names with low-confidence flags and a deterministic reason of ≤200 characters. Use up to five shared TF-IDF terms. Lock exact feature scaling, missing-data and tie policies in C08/C19 ADRs. Use the same fixed candidate sets for TF-IDF baseline and weighted ranking. Record precision@5 and mean reciprocal rank over at least 20 public seeds, with the provisional `0.60` target recorded under TBD-4. Report observed values without tuning solely to disguise misses.
 - **FR-12.** Analyse readable playlists with total/count, duration distribution, top five channels, categories, languages and publication year range. Audit unavailable/deleted/private placeholders, ID duplicates, similar titles at cosine ≥0.90, over-length items, stale items (default five years), live and upcoming items. Stop at 500 and report truncation. Keep reads bounded to SRS costs. Skill SK-6 estimates cost, calls read-only audit and suggests fixes in a table.
 
 ### 5. Playlist selection and the confirmation lifecycle
@@ -151,26 +151,28 @@ Keep `brain/` with an inbox, Projects, Areas, Resources, Archive, an index and a
 | SRS decision | Owner and next evidence |
 | --- | --- |
 | TBD-1 official dates and demo format | Ayush, C03 updates when course staff publish |
-| TBD-2 demo client and elicitation | Aangir, C10 selects and records tested capability, C24 verifies approval UX |
-| TBD-3 liked timestamps | Harshil, C05 evidence and fallback, C23 implements |
-| TBD-4 ranking weights and 0.60 target | Harshil, C08 records defaults and evaluation design, C26 measures and closes or records the gap |
-| TBD-5 licence | Aangir, C04 records team decision or open owner, C36 verifies publication |
-| TBD-6 minimum write scope | Aangir, C10 documents ADR-003 and C22 tests it |
-| TBD-7 demo reauthorisation | Aangir, capture instructions before Stage 4 in C31, verify readiness at C36 |
-| TBD-8 minimum 20 labelled seeds | Harshil, C08 selects and labels the seeds by design close, C26 evaluates |
-| TBD-9 30-item default | Ayush, C18/C27 measure usefulness and cost, C35 records outcome if still open |
-| TBD-10 skill frontmatter | Ayush, C06 checks upstream format, C31 validates it in CI |
-| TBD-11 API allocation and method costs | Aangir, C04 records baseline, C19 verifies and C31 rechecks before a live smoke run |
+| TBD-2 demo client and elicitation | Aangir, C10 selects and records tested capability, C18 verifies approval UX |
+| TBD-3 liked timestamps | Harshil, C05 evidence and fallback, C17 implements |
+| TBD-4 ranking weights and 0.60 target | Harshil, C08 records defaults and evaluation design, C19 measures and closes or records the gap |
+| TBD-5 licence | Aangir, C04 records team decision or open owner, C22 verifies publication |
+| TBD-6 minimum write scope | Aangir, C10 documents ADR-003 and C16 tests it |
+| TBD-7 demo reauthorisation | Aangir, C16 records initial setup prerequisites and C22 captures reauthorisation instructions and verifies release readiness |
+| TBD-8 minimum 20 labelled seeds | Harshil, C08 selects and labels the seeds by design close, C19 evaluates |
+| TBD-9 30-item default | Ayush, C18 measures usefulness and cost, C21 records outcome if still open |
+| TBD-10 skill frontmatter | Ayush, C06 checks upstream format, C22 validates it in CI |
+| TBD-11 API allocation and method costs | Aangir, C04 records baseline, C16 verifies and C22 rechecks before a live smoke run |
 
 ## Team member timeline
 
-**36 planned commits · 12 per teammate · Original target window 16 November–11 December 2026 (IST)**
+**22 planned authored commits · C01–C15 historical · 7 remaining · targets in IST**
 
-| Owner | 12 assigned commits | Responsibility |
-| --- | --- | --- |
-| Aangir Doshi | C01, C04, C07, C10, C13, C16, C19, C22, C25, C28, C31, C36 | Platform, API, OAuth, quota, CI and release |
-| Harshil Srivastav | C02, C05, C08, C11, C14, C17, C20, C23, C26, C29, C32, C34 | Discovery, analysis, scoring evidence and auditing |
-| Ayush Patel | C03, C06, C09, C12, C15, C18, C21, C24, C27, C30, C33, C35 | Curation, confirmation, recovery and the main demo |
+| Owner | Historical assignments | Remaining assignments | Responsibility |
+| --- | --- | --- | --- |
+| Aangir Doshi | C01, C04, C07, C10, C13 | C16, C22 (2) | Platform, quota, OAuth, CI and release |
+| Harshil Srivastav | C02, C05, C08, C11, C14 | C17, C19, C20 (3) | Discovery, analytics, scoring and read-side verification |
+| Ayush Patel | C03, C06, C09, C12, C15 | C18, C21 (2) | Curation, consent, recovery and product demo |
+
+C01–C15 retain their historical wording and IDs. Older documentation or source comments that refer to C16–C36 use the original numbering. Use the [mapping below](#legacy-assignment-mapping) to resolve those references.
 
 ### Stage 1 Requirements and evidence · 16–20 November
 
@@ -540,90 +542,52 @@ I am Harshil Srivastav, the owner of C14. Apply the Shared Antigravity instructi
 I am Ayush Patel, the owner of C15. Apply the Shared Antigravity instructions. Read implementation plan sections 2, 5 and the C15 entry before editing. Implement C15’s validated read-only proposal service using C11 and C12. Retrieve bounded metadata, respect every hard filter and return a reviewable proposal or closest infeasible outcome. Add fixture MCP assertions for caps and zero writes. Reuse eventual quota and signing seams with no provisional live write permission. Update the C15 completion line using the actual verification results.
 ~~~
 
-#### C16 Add SQLite cache and transactional state
+### Remaining implementation and release commits · 3–11 December 2026
 
-**Owner** Aangir Doshi · **Target** Fri 27 Nov 2026 (IST) · **Depends on** C07, C09, C10
+Each entry is one authored commit and one reviewed PR. The sections inside it retain the original workstreams, tests and completion gates. Target dates are team planning dates under TBD-1. Work can be prepared in parallel where a dependency contract is available. Merge prerequisites before dependent changes and record any date adjustments without backdating.
 
-**SRS** FR-11.4–11.9, DB-1–DB-3, NFR-PRV, NFR-REL · **Implementation plan sections** 2, 3, 5
+#### Legacy assignment mapping
 
-**Commit message** `feat(storage): add SQLite cache and transactional state`
+| Original assignment | Active commit |
+| --- | --- |
+| C16, C19, C22, C25, C28 | [C16](#c16-build-the-platform-and-offline-checks) |
+| C17, C20, C23 | [C17](#c17-deliver-channels-recommendations-and-engagement) |
+| C18, C21, C24, C27, C30 | [C18](#c18-finish-ordered-playlists-and-confirmed-writes) |
+| C26, C29 | [C19](#c19-publish-scoring-evidence-and-playlist-audit) |
+| C32, C34 | [C20](#c20-deliver-brain-ingest-and-verify-read-features) |
+| C33, C35 | [C21](#c21-finish-product-skills-and-the-curation-demo) |
+| C31, C36 | [C22](#c22-close-ci-verification-and-prepare-the-release) (legacy C31 opens with fixture CI in active C16, closes in C22) |
 
-- [ ] Pending · Actual date (IST) — · Evidence — <!-- C16-status -->
+#### C16 Build the platform and offline checks
 
-**Implementation**
+**Owner** Aangir Doshi · **Target** Thu 3 Dec 2026 (IST) · **Depends on** C04, C06, C07, C09, C10, C13–C15
+
+**Workstreams** legacy C16, legacy C19, legacy C22, legacy C25, legacy C28, plus the opening fixture gate from legacy C31 · **Implementation plan sections** 1, 2, 3, 5, 6, 7
+
+**Commit message** `feat(platform): integrate storage quota OAuth and offline checks`
+
+- [ ] In progress · Actual date (IST) 2026-11-27 · Evidence: Implemented SQLite cache/migrations (`storage.py`, `focuslist purge`), atomic quota/gateway (`quota.py`, `gateway.py`, wired to C15 proposals & `estimate_quota`/`get_quota_status`/`focuslist quota`), PKCE OAuth & isolated credential store (`auth.py`, `focuslist auth`), bounded write primitives & guarded placeholder `confirm_playlist`/`undo_playlist` (`live_provider.py`, `write_contracts.py`, `server.py`), `local-check`/`brain-refine` skills (`SKE-SK1` 15.27s, `SKE-SK4`), opening PR fixture CI (`.github/workflows/pr-fixture-ci.yml`), `ADR-006`, and `docs/testing/c16-platform-and-skills-evidence.md`. Verified offline: `ruff check .` clean, `pytest -v` 231 passed. PR #15 opened (https://github.com/aangir14/YouTube_MCP_SE/pull/15); pending both-teammate FR-9 review. <!-- C16-status -->
+
+Stabilise storage, quota, credentials and provider writes. Package the two developer skills and land a fixture-only PR gate for the next five changes.
+
+<a id="c16-add-sqlite-cache-and-transactional-state"></a>
+##### Add SQLite cache and transactional state (legacy C16)
+
+**SRS** FR-11.4–11.9, DB-1–DB-3, NFR-PRV, NFR-REL
 
 1. Add migrations for cache, Pacific ledger, proposals and action/write progress. Configure WAL, foreign keys, indexed expiry and account scoping, explicit transactions, unique proposal IDs, atomic claims and append-only action history. Use SQL parameters and local user-only storage.
 2. Implement cache lookup, write and expiration using the injected clock. Distinguish the SRS TTLs, the hard 30-day maximum, the separate ledger/action retention and proposal expiry plus seven days. Wire startup/daily local cleanup and account-scoped purge.
-3. Test migration from empty DB, concurrent state claims, account separation, expiry buckets, invalid values, purge and retention. Prepare storage interfaces C19 and C21 can reuse.
+3. Test migration from empty DB, concurrent state claims, account separation, expiry buckets, invalid values, purge and retention. Prepare storage interfaces for the quota workstream below and for C18.
 4. Wire focuslist purge to account-scoped cleanup through the shared CLI and test its success, invalid-state and error responses. No background API polling.
 
 **Done when** Fake-clock tests prove zero provider requests on a usable cache hit, correct expiry and user-specific purge. Transaction tests prove only one claim succeeds and failures leave consistent state.
 
-**Prompt**
+Run migrations twice against the same temporary database and assert the second run is safe.
 
-~~~text
-I am Aangir Doshi, the owner of C16. Apply the Shared Antigravity instructions. Read implementation plan sections 2, 3, 5 and the C16 entry before editing. Build C16’s SQLite repositories and migrations. Implement SRS TTLs and retention, account-keyed cache, user-only persistence, local cleanup, bound SQL and atomic proposal state transitions. Cover repeat migrations, cache hit/expiry, account purge and concurrent claim with a temporary DB. Update the C16 completion line using the actual verification results.
-~~~
+<a id="c19-enforce-quota-before-provider-calls"></a>
+##### Enforce quota before provider calls (legacy C19)
 
-#### C17 Rank similar channels in two passes
-
-**Owner** Harshil Srivastav · **Target** Fri 27 Nov 2026 (IST) · **Depends on** C08, C10, C11
-
-**SRS** FR-2, FR-6 contract, TQ-1, TQ-3 · **Implementation plan sections** 2, 4
-
-**Commit message** `feat(discovery): rank similar channels in two passes`
-
-- [ ] Pending · Actual date (IST) — · Evidence — <!-- C17-status -->
-
-**Implementation**
-
-1. Register similar_channels. Resolve supported handle, URL or ID forms through the provider, return actionable legacy-URL errors, and build a seed profile from metadata and up to 20 uploads.
-2. Bound search to three calls, omit the seed and dedupe/cap candidates at 100. Score with text, topic, language and size. Rerank the top 10 using recent uploads subject to the request budget. Exclude inaccessible or empty channels. Flag hidden subscriber counts and missing keywords.
-3. Write unit cases for weighted scoring/ties and MCP cases for valid handle, missing metadata, invalid ID, legacy URL and unsupported/no-public-upload candidates. Assert limit, candidate/page bounds and stable order.
-
-**Done when** ST-FR2 returns exact expected fixture ranking and safe explanation inputs. Hidden counts remain unknown. Limits respect default 10, max 25 and NFR-QUOTA baseline.
-
-**Prompt**
-
-~~~text
-I am Harshil Srivastav, the owner of C17. Apply the Shared Antigravity instructions. Read implementation plan sections 2, 4 and the C17 entry before editing. Implement C17 similar_channels with shared parsing, capped provider calls and C08 scoring. Build the seed, rank bounded deduplicated candidates and rerank only the top ten. Flag unknown public metrics and provide clear legacy URL guidance. Test parity and limits through fixture MCP. Update the C17 completion line using the actual verification results.
-~~~
-
-#### C18 Order playlists and build study sessions
-
-**Owner** Ayush Patel · **Target** Fri 27 Nov 2026 (IST) · **Depends on** C12, C15
-
-**SRS** FR-8, FR-5, NFR-REL, TQ-1, TBD-9 · **Implementation plan sections** 4, 5, 6
-
-**Commit message** `feat(playlist): order and split playlists into study sessions`
-
-- [ ] Pending · Actual date (IST) — · Evidence — <!-- C18-status -->
-
-**Implementation**
-
-1. Add learning-path, relevance and chronological ordering. Detect numbered same-channel series only when the title cosine threshold holds. Keep detected series adjacent in episode order and use difficulty cues and stable relevance for the remaining order.
-2. Integrate token/title near-duplicate handling, MMR with λ=0.7 and default channel cap of three before or during selection. Verify the solver still satisfies hard duration and language constraints. Keep 30 default and 50 maximum unless the SRS is formally updated.
-3. Pack consecutive whole videos into study sessions, flag a video longer than a session, report time totals, and test deterministic grouping, order, duplication, caps and duration invariants. Complete the C12 property-test harness with at least 1,000 generated constraint cases. Record fixture evidence for whether the default item count remains suitable.
-
-**Done when** FR-8 tests prove all three ordering modes, series adjacency, channel cap, reported oversize sessions and unchanged hard constraints. No ordered or packed item disappears from the selected result.
-
-**Prompt**
-
-~~~text
-I am Ayush Patel, the owner of C18. Apply the Shared Antigravity instructions. Read implementation plan sections 4, 5, 6 and the C18 entry before editing. Implement C18 learning-path ordering, diversity and study sessions as pure curation logic using C12/C15. Keep SRS thresholds and duration constraints. Test edge cases for series, duplicate titles, ties, channel caps and overlong single videos. Record C18 evidence for the 30-item default. Update the C18 completion line using the actual verification results.
-~~~
-
-#### C19 Enforce quota before provider calls
-
-**Owner** Aangir Doshi · **Target** Mon 30 Nov 2026 (IST) · **Depends on** C13, C16
-
-**SRS** FR-10, NFR-QUOTA-01, TQ-5, TQ-6, TBD-11 · **Implementation plan sections** 2, 3, 6
-
-**Commit message** `feat(quota): enforce budget before provider calls`
-
-- [ ] Pending · Actual date (IST) — · Evidence — <!-- C19-status -->
-
-**Implementation**
+**SRS** FR-10, NFR-QUOTA-01, TQ-5, TQ-6, TBD-11
 
 1. Verify applicable quota allocations and endpoint costs against official evidence for TBD-11. Centralise per-method costs, tier caps and Pacific reset. Add an atomic admission check for worst-case units and searches including possible retries. Make estimate_quota and get_quota_status fully local.
 2. Integrate charge-attempt logic at the outbound gateway so each page and attempt, including retries, is counted once. Reserve/release budget consistently under concurrency, record cache hits at zero cost, honour remaining retry allowance and stop on quota or rate exhaustion.
@@ -632,71 +596,12 @@ I am Ayush Patel, the owner of C18. Apply the Shared Antigravity instructions. R
 
 **Done when** ST-FR10 shows dry run without calls, an observed charge matching dispatch and zero provider calls on over-budget work. Estimated general and search balances are visible. Limits remain explicit for scheduled CI.
 
-**Prompt**
+Wire the shared quota admission and dispatch accounting into C15 proposals. Replace the provisional fixed 15-unit charge with observed attempt counts, and exercise both quota buckets, the request cap and the safety margin with the proposal path.
 
-~~~text
-I am Aangir Doshi, the owner of C19. Apply the Shared Antigravity instructions. Read implementation plan sections 2, 3, 6 and the C19 entry before editing. Implement C19 quota manager and dry-run/status MCP tools using C13/C16. Use the SRS baselines and recorded official cost evidence, two enforced buckets, Pacific days, safety margin, per-request bound and per-attempt accounting. Add concurrency, retry, cache, rollover and zero-call rejection tests. Update the C19 completion line using the actual verification results.
-~~~
+<a id="c22-implement-least-privilege-google-oauth"></a>
+##### Implement least-privilege Google OAuth (legacy C22)
 
-#### C20 Recommend from consented account data
-
-**Owner** Harshil Srivastav · **Target** Mon 30 Nov 2026 (IST) · **Depends on** C08, C10, C11, C16, C19
-
-**SRS** FR-3, FR-6 contract, NFR-PRV, TQ-3 · **Implementation plan sections** 2, 3, 4
-
-**Commit message** `feat(recommendations): personalise discovery from consented data`
-
-- [ ] Pending · Actual date (IST) — · Evidence — <!-- C20-status -->
-
-**Implementation**
-
-1. Register recommend_videos. In fixture tests model authorised and missing-consent contexts. In live wiring use the auth interface for the authorised learner. Load at most 200 likes, 200 subscriptions and five playlists with at most 100 items each. Skip unselected sources.
-2. Construct a profile from text/category/duration/language. Generate candidates from up to three searches and up to five relevant subscribed channels. Exclude liked videos and candidates in loaded playlists. Rank with the agreed weights, list up to three contributing items or channels, and disclose lack of watch-history input.
-3. Bind profile cache lifetime and identity to the source data. Test empty and missing-auth responses, opt-in source boundaries, already-seen exclusion, missing fields, quota and cleanup.
-
-**Done when** ST-FR3 returns the expected fixture results and reasons, with exact source counts and authorised-account separation. Purge invalidates the derived profile. Full Google consent is covered by C22.
-
-**Prompt**
-
-~~~text
-I am Harshil Srivastav, the owner of C20. Apply the Shared Antigravity instructions. Read implementation plan sections 2, 3, 4 and the C20 entry before editing. Implement C20’s personalised recommendations using authorised source context, C08 scoring and C19 quota contract. Bound every source and candidate group, remove known items, return reasons, and disclose lack of watch-history data. Test AUTH_REQUIRED, NO_PROFILE_DATA, cache expiry/purge and ranked fixture MCP output. Update the C20 completion line using the actual verification results.
-~~~
-
-#### C21 Bind approval to the stored proposal
-
-**Owner** Ayush Patel · **Target** Mon 30 Nov 2026 (IST) · **Depends on** C09, C15, C16
-
-**SRS** FR-7.1–7.5, FR-5.7–5.11, DB, NFR-SAF · **Implementation plan sections** 2, 5, 6
-
-**Commit message** `feat(confirm): bind approval to the stored proposal`
-
-- [ ] Pending · Actual date (IST) — · Evidence — <!-- C21-status -->
-
-**Implementation**
-
-1. Persist the proposal’s immutable canonical payload and hash. Implement HMAC-SHA-256 with the installation key abstraction and bind ID, order, title, privacy, action and expiry. Model account/action checks and the scope of each resume or undo target. Use constant-time signature comparison.
-2. Wire verification and claim checks before any YouTube API call. Invalidate a changed or superseded proposal. Use a test key and fake time. Store attempts safely without tokens. Model the recorded idempotent-success response and reject conflicting or in-progress actions without starting a second write.
-3. Test mutation of every signed field, expiration, wrong action, invalid signature, replay, same-proposal concurrent claims and exact recorded success. Stub any write execution until C27 and retain C24's separate approval interaction.
-
-**Done when** Rejected or unauthorised requests generate zero outbound calls. The same valid proposal can be claimed at most once. Positive tests use fake objects and any replay of a recorded success adds zero writes.
-
-**Prompt**
-
-~~~text
-I am Ayush Patel, the owner of C21. Apply the Shared Antigravity instructions. Read implementation plan sections 2, 5, 6 and the C21 entry before editing. Implement C21 proposal persistence, token signing/verification and atomic single-use claims from C09 and C16. Validate exact stored action and expiry before external calls. Test tampering, clock boundaries, changed order, replay and concurrency with a fake key and provider spy. Preserve the distinct human-consent gate for C24/C27. Update the C21 completion line using the actual verification results.
-~~~
-
-#### C22 Implement least-privilege Google OAuth
-
-**Owner** Aangir Doshi · **Target** Wed 2 Dec 2026 (IST) · **Depends on** C10, C13, C16
-
-**SRS** FR-9, COM-2–COM-4, NFR-SEC, NFR-PRV, TQ-4, TBD-6 · **Implementation plan sections** 2, 3, 5, 6
-
-**Commit message** `feat(auth): implement least-privilege Google OAuth`
-
-- [ ] Pending · Actual date (IST) — · Evidence — <!-- C22-status -->
-
-**Implementation**
+**SRS** FR-9, COM-2–COM-4, NFR-SEC, NFR-PRV, TQ-4, TBD-6
 
 1. Implement CLI auth login/status/logout using the Google library behind platform. Read OAuth configuration outside the repo. Bind a temporary loopback listener, require expected state and PKCE, show scopes before consent and shut down the listener cleanly.
 2. Implement secure credential storage plus any permitted user-only fallback, refreshing, expiry/status and Testing-mode warning. Use readonly for reads, the agreed extra scope only after confirmed write intent. On invalid_grant, revocation or decline return stable guidance, stop retries and purge data where required.
@@ -704,23 +609,86 @@ I am Ayush Patel, the owner of C21. Apply the Shared Antigravity instructions. R
 
 **Done when** ST-FR9 and secure-storage/scope tests pass. The initial read login cannot obtain write scope accidentally, and the status command emits scope/age without credentials. Both teammates review.
 
+<a id="c25-implement-bounded-playlist-write-primitives"></a>
+##### Implement bounded playlist write primitives (legacy C25)
+
+**SRS** FR-5.9–5.14, FR-7, FR-9.9, FR-11, COM-5
+
+1. Add official own-channel check, playlist creation, approved video insertion with position and playlist deletion behind platform-only provider methods. Accept structured inputs and return normalised IDs and outcomes. Require authorised write context. Keep public write entry points in Ayush’s confirmation workflow.
+2. Integrate attempt charging and timeout handling. Distinguish known rejection, retry-safe transient failure and ambiguous remote result. Do not issue a blind replay where it might create a second playlist or insert the same item.
+3. Mock missing-channel, insufficient permission, quota, successful insertion, deletion and ambiguous failures. Check safe error representations and handoff contracts with C18 for creation, resume and undo.
+4. Test public, unlisted and private modes supported by the agreed proposal schema using sanitised fixtures, and ensure the provider receives only the stored approved visibility.
+
+**Done when** Provider tests record exact methods, positions and accounting. Missing channel maps to NO_YOUTUBE_CHANNEL and ambiguous failures produce a safe outcome with no duplicate call. FR-9 code changes, if any, receive both teammate reviews.
+
+<a id="c28-deliver-local-check-and-brain-refine"></a>
+##### Deliver local-check and brain-refine (legacy C28)
+
+**SRS** SK-0, SK-1, SK-4, SB, NFR-USA, TQ-7
+
+1. Package local-check with the agreed frontmatter. Build, test, start in fixture mode, fetch fixture video details through MCP and report PASS, FAIL or SKIPPED for each stage. Always terminate the subprocess and preserve user data. Connect the required doctor surface and optional safe provider/quota/age hints where appropriate.
+2. Package brain-refine to move confirmed notes into PARA locations, identify duplicates, repair references, update index/log and invoke the vault validator. Operate on synthetic vault copies in tests and retain provenance when deduplicating.
+3. Add three deterministic evaluation cases per skill including a negative case. Measure local-check against the offline CI target and record the clean-clone usability check when the needed environment is available.
+4. For the first integration, run skill validation over the skills actually present and carry forward the stage evidence. The final required inventory is SK-1 through SK-6 after C21.
+
+**Done when** SKE-SK1 and SKE-SK4 demonstrate three meaningful cases each and no leftover subprocess, lost provenance or secret output. The elapsed-time and environment evidence is recorded accurately.
+
+Include an induced build or MCP failure with teardown, plus duplicate-note and repaired-link cases for brain-refine.
+
+##### Open the fixture-only PR gate (first part of legacy C31)
+
+Use two supported Python versions for the fixture build, lint, type and available unit/integration/MCP smoke checks. Enforce fixture mode and fail on live-network or secret use. Wire inventory, reference and coverage reporting for the features present. Record missing coverage or pending checks explicitly so the full C22 gate can enforce them after integration.
+
+Before any provider write primitive is wired, guard the existing placeholder confirmation route. Verify even fixture/mock PR calls with missing, placeholder, tampered or unapproved action data produce zero provider writes and no live dispatch. A live write requires the authorised context supplied and verified by C18. Keep C15's read-only proposal path eligible for fixture checks.
+
+**Integration gate** Publish repository, budget, consent and write-provider contracts for C17/C18. Both teammates review FR-9 code and any FR-7 code. The live write path stays closed until C18 integrates verified approval.
+
 **Prompt**
 
 ~~~text
-I am Aangir Doshi, the owner of C22. Apply the Shared Antigravity instructions. Read implementation plan sections 2, 3, 5, 6 and the C22 entry before editing. Implement C22 OAuth and credential lifecycle against ADR-003 and SRS FR-9. Use PKCE, state, loopback, readonly then incremental agreed write consent, safe storage, expiry handling and purge. Mock Google interactions and assert exact requested scopes, storage and redaction. Do not use real tokens in tests. Update the C22 completion line using the actual verification results.
+I am Aangir Doshi, the owner of C16. Apply the Shared Antigravity instructions. Read implementation plan sections 1, 2, 3, 5, 6, 7 and the entire C16 entry. Implement the five workstreams and the opening CI gate in that order. Write reusable contracts for the next owners. Test repeat migrations, mocked OAuth, API-attempt charging and failure teardown. Keep write primitives inaccessible from placeholder, unsigned or unapproved MCP actions. Run only fixture checks in PRs. Work through every listed legacy workstream and its completion gate as one assignment. Update only the C16 completion line using actual verification results.
 ~~~
 
-#### C23 Report engagement and compare periods
+#### C17 Deliver channels recommendations and engagement
 
-**Owner** Harshil Srivastav · **Target** Wed 2 Dec 2026 (IST) · **Depends on** C05, C08, C10, C11, C16, C19
+**Owner** Harshil Srivastav · **Target** Fri 4 Dec 2026 (IST) · **Depends on** C05, C08, C10, C11, C14, C16
 
-**SRS** FR-4, NFR-QUOTA-01, TQ-1, TQ-3, TBD-3 · **Implementation plan sections** 2, 3, 4
+**Workstreams** legacy C17, legacy C20, legacy C23 · **Implementation plan sections** 2, 3, 4, 6, 7
 
-**Commit message** `feat(analytics): report engagement and compare periods`
+**Commit message** `feat(discovery): deliver channel recommendations and engagement tools`
 
-- [ ] Pending · Actual date (IST) — · Evidence — <!-- C23-status -->
+- [ ] Pending · Actual date (IST) — · Evidence — <!-- C17-status -->
 
-**Implementation**
+Ship FR-2, FR-3 and FR-4 over the shared authorised read and quota contracts.
+
+<a id="c17-rank-similar-channels-in-two-passes"></a>
+##### Rank similar channels in two passes (legacy C17)
+
+**SRS** FR-2, FR-6 contract, TQ-1, TQ-3
+
+1. Register similar_channels. Resolve supported handle, URL or ID forms through the provider, return actionable legacy-URL errors, and build a seed profile from metadata and up to 20 uploads.
+2. Bound search to three calls, omit the seed and dedupe/cap candidates at 100. Score with text, topic, language and size. Rerank the top 10 using recent uploads subject to the request budget. Exclude inaccessible or empty channels. Flag hidden subscriber counts and missing keywords.
+3. Write unit cases for weighted scoring/ties and MCP cases for valid handle, missing metadata, invalid ID, legacy URL and unsupported/no-public-upload candidates. Assert limit, candidate/page bounds and stable order.
+
+**Done when** ST-FR2 returns exact expected fixture ranking and safe explanation inputs. Hidden counts remain unknown. Limits respect default 10, max 25 and NFR-QUOTA baseline.
+
+<a id="c20-recommend-from-consented-account-data"></a>
+##### Recommend from consented account data (legacy C20)
+
+**SRS** FR-3, FR-6 contract, NFR-PRV, TQ-3
+
+1. Register recommend_videos. In fixture tests model authorised and missing-consent contexts. In live wiring use the auth interface for the authorised learner. Load at most 200 likes, 200 subscriptions and five playlists with at most 100 items each. Skip unselected sources.
+2. Construct a profile from text/category/duration/language. Generate candidates from up to three searches and up to five relevant subscribed channels. Exclude liked videos and candidates in loaded playlists. Rank with the agreed weights, list up to three contributing items or channels, and disclose lack of watch-history input.
+3. Bind profile cache lifetime and identity to the source data. Test empty and missing-auth responses, opt-in source boundaries, already-seen exclusion, missing fields, quota and cleanup.
+
+**Done when** ST-FR3 returns the expected fixture results and reasons, with exact source counts and authorised-account separation. Purge invalidates the derived profile. Full Google consent is covered by C16.
+
+Use the SRS FR-3 weights if the C08 ADR disagrees. Correct the discovery ADR and record the reasoning before measuring.
+
+<a id="c23-report-engagement-and-compare-periods"></a>
+##### Report engagement and compare periods (legacy C23)
+
+**SRS** FR-4, NFR-QUOTA-01, TQ-1, TQ-3, TBD-3
 
 1. Register analyse_engagement with source choice, preset or explicit inclusive/exclusive boundaries from C08, optional comparison and bucket choice. Read selected likes, subscriptions and playlists without search. Apply the documented event/publication fallback and tag the displayed provenance.
 2. Aggregate channels and resolved category names with counts/shares, weekly or monthly trends, source counts, mean/median and histogram buckets. Include chart data and a summary. Compute absolute/percentage comparisons, use null for zero/empty baseline and emit partial results when fewer than ten items exist.
@@ -728,23 +696,52 @@ I am Aangir Doshi, the owner of C22. Apply the Shared Antigravity instructions. 
 
 **Done when** ST-FR4 compares two fixture periods through MCP with exact expected results. No spurious date inference or zero-division occurs, and search call count is zero.
 
+**Integration gate** Publish stable response shapes and ST-FR2–ST-FR4 evidence for C18–C20. Resolve the recorded C08 recommendation-weight discrepancy before implementing FR-3. The SRS uses 0.60/0.15/0.15/0.10. Preserve TBD-3 if liked timestamps remain unverified.
+
 **Prompt**
 
 ~~~text
-I am Harshil Srivastav, the owner of C23. Apply the Shared Antigravity instructions. Read implementation plan sections 2, 3, 4 and the C23 entry before editing. Implement C23 engagement analytics using the agreed event timestamp and fallback policy. Include time buckets, shares, categories, source counts and duration metrics. Test comparisons and sparse responses through MCP. Keep provider work read-only and within zero searches/60 general units. Update the C23 completion line using the actual verification results.
+I am Harshil Srivastav, the owner of C17. Apply the Shared Antigravity instructions. Read implementation plan sections 2, 3, 4, 6, 7 and the entire C17 entry. Build the three read tools with the stated source caps, explainable ranking, UTC periods and disclosed timestamp provenance. Test negative input, no consent, empty profiles, quota bounds and account-data purge. Reconcile FR-3 defaults to the SRS and exercise each tool through fixture MCP. Work through every listed legacy workstream and its completion gate as one assignment. Update only the C17 completion line using actual verification results.
 ~~~
 
-#### C24 Protect the approval flow from untrusted metadata
+#### C18 Finish ordered playlists and confirmed writes
 
-**Owner** Ayush Patel · **Target** Wed 2 Dec 2026 (IST) · **Depends on** C10, C14, C17, C21
+**Owner** Ayush Patel · **Target** Mon 7 Dec 2026 (IST) · **Depends on** C09, C10, C12, C14–C17
 
-**SRS** FR-7.5–7.9, NFR-SEC, NFR-SAF, SK-2, TBD-2 · **Implementation plan sections** 2, 5, 6
+**Workstreams** legacy C18, legacy C21, legacy C24, legacy C27, legacy C30 · **Implementation plan sections** 2, 3, 4, 5, 6, 7
 
-**Commit message** `test(security): enforce the untrusted metadata boundary`
+**Commit message** `feat(curation): secure playlist approval creation and recovery`
 
-- [ ] Pending · Actual date (IST) — · Evidence — <!-- C24-status -->
+- [ ] Pending · Actual date (IST) — · Evidence — <!-- C18-status -->
 
-**Implementation**
+Complete FR-5, FR-7 and FR-8 through the same stored-action flow, from ordering and proposal through approved creation, recovery and undo.
+
+<a id="c18-order-playlists-and-build-study-sessions"></a>
+##### Order playlists and build study sessions (legacy C18)
+
+**SRS** FR-8, FR-5, NFR-REL, TQ-1, TBD-9
+
+1. Add learning-path, relevance and chronological ordering. Detect numbered same-channel series only when the title cosine threshold holds. Keep detected series adjacent in episode order and use difficulty cues and stable relevance for the remaining order.
+2. Integrate token/title near-duplicate handling, MMR with λ=0.7 and default channel cap of three before or during selection. Verify the solver still satisfies hard duration and language constraints. Keep 30 default and 50 maximum unless the SRS is formally updated.
+3. Pack consecutive whole videos into study sessions, flag a video longer than a session, report time totals, and test deterministic grouping, order, duplication, caps and duration invariants. Complete the C12 property-test harness with at least 1,000 generated constraint cases. Record fixture evidence for whether the default item count remains suitable.
+
+**Done when** FR-8 tests prove all three ordering modes, series adjacency, channel cap, reported oversize sessions and unchanged hard constraints. No ordered or packed item disappears from the selected result.
+
+<a id="c21-bind-approval-to-the-stored-proposal"></a>
+##### Bind approval to the stored proposal (legacy C21)
+
+**SRS** FR-7.1–7.5, FR-5.7–5.11, DB, NFR-SAF
+
+1. Persist the proposal’s immutable canonical payload and hash. Implement HMAC-SHA-256 with the installation key abstraction and bind ID, order, title, privacy, action and expiry. Model account/action checks and the scope of each resume or undo target. Use constant-time signature comparison.
+2. Wire verification and claim checks before any YouTube API call. Invalidate a changed or superseded proposal. Use a test key and fake time. Store attempts safely without tokens. Model the recorded idempotent-success response and reject conflicting or in-progress actions without starting a second write.
+3. Test mutation of every signed field, expiration, wrong action, invalid signature, replay, same-proposal concurrent claims and exact recorded success. Stub any write execution until C18 and retain C18's separate approval interaction.
+
+**Done when** Rejected or unauthorised requests generate zero outbound calls. The same valid proposal can be claimed at most once. Positive tests use fake objects and any replay of a recorded success adds zero writes.
+
+<a id="c24-protect-the-approval-flow-from-untrusted-metadata"></a>
+##### Protect the approval flow from untrusted metadata (legacy C24)
+
+**SRS** FR-7.5–7.9, NFR-SEC, NFR-SAF, SK-2, TBD-2
 
 1. Add the shared metadata boundary for title, description, tags and channel text. Preserve data fields, strip control and zero-width characters, cap description at 500 characters and mark external text untrusted. Ensure summaries and rankings cannot synthesize approval or alter canonical proposal fields.
 2. Wire the separate human approval interaction. Use elicitation where supported. For the agreed fallback, verify the client visibly presents the exact proposal, captures an explicit human decision in a separate turn and only then submits confirmation. An absent, ambiguous, negative or stale decision never starts a write.
@@ -752,145 +749,23 @@ I am Harshil Srivastav, the owner of C23. Apply the Shared Antigravity instructi
 
 **Done when** All adversarial/nonapproval cases produce zero writes. Displayed and confirmed actions match, and only a separate verified human decision can take the write path. Any demo-client capability still untested is recorded as pending. Both teammates review FR-7 code.
 
-**Prompt**
+<a id="c27-create-the-approved-playlist-and-record-progress"></a>
+##### Create the approved playlist and record progress (legacy C27)
 
-~~~text
-I am Ayush Patel, the owner of C24. Apply the Shared Antigravity instructions. Read implementation plan sections 2, 5, 6 and the C24 entry before editing. Implement C24’s untrusted-metadata and human approval boundary across MCP results and the curation path. Centralise marking and sanitisation. Exercise 15 synthetic adversarial cases plus accept, decline, missing/stale decision and changed proposal with fixture tools. Verify client-specific approval behaviour without using live account writes. Update the C24 completion line using the actual verification results.
-~~~
-
-#### C25 Implement bounded playlist write primitives
-
-**Owner** Aangir Doshi · **Target** Thu 3 Dec 2026 (IST) · **Depends on** C13, C19, C22
-
-**SRS** FR-5.9–5.14, FR-7, FR-9.9, FR-11, COM-5 · **Implementation plan sections** 2, 3, 5
-
-**Commit message** `feat(provider): support bounded playlist write operations`
-
-- [ ] Pending · Actual date (IST) — · Evidence — <!-- C25-status -->
-
-**Implementation**
-
-1. Add official own-channel check, playlist creation, approved video insertion with position and playlist deletion behind platform-only provider methods. Accept structured inputs and return normalised IDs and outcomes. Require authorised write context. Keep public write entry points in Ayush’s confirmation workflow.
-2. Integrate attempt charging and timeout handling. Distinguish known rejection, retry-safe transient failure and ambiguous remote result. Do not issue a blind replay where it might create a second playlist or insert the same item.
-3. Mock missing-channel, insufficient permission, quota, successful insertion, deletion and ambiguous failures. Check safe error representations and handoff contracts with C27 and C30.
-4. Test public, unlisted and private modes supported by the agreed proposal schema using sanitised fixtures, and ensure the provider receives only the stored approved visibility.
-
-**Done when** Provider tests record exact methods, positions and accounting. Missing channel maps to NO_YOUTUBE_CHANNEL and ambiguous failures produce a safe outcome with no duplicate call. FR-9 code changes, if any, receive both teammate reviews.
-
-**Prompt**
-
-~~~text
-I am Aangir Doshi, the owner of C25. Apply the Shared Antigravity instructions. Read implementation plan sections 2, 3, 5 and the C25 entry before editing. Implement C25 official YouTube write primitives and channel checks in platform. Require the confirmed-write context from the caller, use C19 charging and C22 credentials, and preserve enough result state for reconciliation. Test response parsing, no-channel errors and ambiguous failures with mocked transport. Leave write orchestration to C27/C30. Update the C25 completion line using the actual verification results.
-~~~
-
-#### C26 Explain scores and publish ranking evaluation
-
-**Owner** Harshil Srivastav · **Target** Thu 3 Dec 2026 (IST) · **Depends on** C08, C14, C15, C17, C20
-
-**SRS** FR-6, FR-1–FR-3, FR-5 explanations, NFR-PERF, TBD-4, TBD-8 · **Implementation plan sections** 2, 4, 5, 6
-
-**Commit message** `feat(ranking): explain scores and report relevance results`
-
-- [ ] Pending · Actual date (IST) — · Evidence — <!-- C26-status -->
-
-**Implementation**
-
-1. Finish the shared deterministic score explanation for each ranking path. Return raw feature values, weights, contributions, up to five shared terms where relevant, missing-field names and a reason limited to 200 characters. Account reasons cite up to three contributing items or channels. Connect active weights to the scoring resource.
-2. Ensure each reported score matches its displayed contributions within 0.000001. Use an injected offline corpus or fixture metadata. Harmonise C15's reasons within the existing playlist proposal contract without changing its selection semantics.
-3. Run TF-IDF-only and weighted ranking over the same fixed labelled seed candidates from C08. Save per-seed and aggregate precision@5/MRR, reproducibility command and the ranking benchmark on the SRS environment when available. Record actual outcomes against the provisional target and any approved weight decision.
-
-**Done when** Explanations are deterministic and make zero provider calls. The fixture report covers at least 20 labelled seeds and shows actual metric values and parameters. Score, resource settings and documented chosen weights agree.
-
-**Prompt**
-
-~~~text
-I am Harshil Srivastav, the owner of C26. Apply the Shared Antigravity instructions. Read implementation plan sections 2, 4, 5, 6 and the C26 entry before editing. Implement C26 explanations and scoring resource, sharing C08’s feature definitions. Test the contribution sum, explanation length, missing flags and zero provider calls. Run the same-candidate baseline and weighted evaluation on the labelled fixture set. Publish the actual results, timing and target gap if one exists. Update the C26 completion line using the actual verification results.
-~~~
-
-#### C27 Create the approved playlist and record progress
-
-**Owner** Ayush Patel · **Target** Thu 3 Dec 2026 (IST) · **Depends on** C18, C19, C21, C22, C24, C25
-
-**SRS** FR-5.9–5.14, FR-7, FR-9, NFR-SAF, TQ-3 · **Implementation plan sections** 2, 3, 5, 6
-
-**Commit message** `feat(playlist): create the approved playlist exactly once`
-
-- [ ] Pending · Actual date (IST) — · Evidence — <!-- C27-status -->
-
-**Implementation**
+**SRS** FR-5.9–5.14, FR-7, FR-9, NFR-SAF, TQ-3
 
 1. Wire confirm_playlist to the explicit client approval and verified canonical proposal. Perform local quota preflight, authorised scope handling and channel check before create. Apply topic/day title and private default from the stored action. Use an injectable scheduler/clock to enforce a per-operation write interval of at least one second across confirmed writes.
-2. Call create followed by ordered insertions. Persist returned ID and each confirmed insertion. Return the existing successful result on an exact repeat. If a write fails, already completed work remains recorded and the partial outcome includes the playlist URL where known and failed step. Full resume and undo follow in C30.
+2. Call create followed by ordered insertions. Persist returned ID and each confirmed insertion. Return the existing successful result on an exact repeat. If a write fails, already completed work remains recorded and the partial outcome includes the playlist URL where known and failed step. Full resume and undo follow in C18.
 3. Write ST-FR5 through the scripted MCP client for a full success and for decline, changed/expired token, wrong action, missing channel, unavailable quota, simulated mid-run failure and repeated confirmation. Use only a fixture/mocked write provider.
 
 **Done when** The successful case writes exactly the displayed playlist in order. Invalid token and insufficient budget make zero outbound calls. Missing channel makes zero writes. An exact replay of success makes zero additional writes. Recorded write spacing and partial outcome match policy. Both teammates review FR-7 code changes.
 
-**Prompt**
+Use fake time and a provider spy for positive and negative MCP cases. Treat confirmed writes as unavailable until the signed, verified human decision path is connected.
 
-~~~text
-I am Ayush Patel, the owner of C27. Apply the Shared Antigravity instructions. Read implementation plan sections 2, 3, 5, 6 and the C27 entry before editing. Implement C27’s confirmed creation using C21/C24 approval, C19 budget, C22 auth and C25 write primitives. Persist progress, enforce stored title/privacy/order and one-write-per-second pacing, and return recorded success on replay. Cover positive and negative MCP scenarios with synthetic fixtures, provider spies and fake time. Update the C27 completion line using the actual verification results.
-~~~
+<a id="c30-recover-partial-writes-and-confirm-undo"></a>
+##### Recover partial writes and confirm undo (legacy C30)
 
-#### C28 Deliver local-check and brain-refine
-
-**Owner** Aangir Doshi · **Target** Mon 7 Dec 2026 (IST) · **Depends on** C04, C06, C07, C10, C14
-
-**SRS** SK-0, SK-1, SK-4, SB, NFR-USA, TQ-7 · **Implementation plan sections** 1, 2, 6
-
-**Commit message** `feat(skills): add local-check and brain-refine`
-
-- [ ] Pending · Actual date (IST) — · Evidence — <!-- C28-status -->
-
-**Implementation**
-
-1. Package local-check with the agreed frontmatter. Build, test, start in fixture mode, fetch fixture video details through MCP and report PASS, FAIL or SKIPPED for each stage. Always terminate the subprocess and preserve user data. Connect the required doctor surface and optional safe provider/quota/age hints where appropriate.
-2. Package brain-refine to move confirmed notes into PARA locations, identify duplicates, repair references, update index/log and invoke the vault validator. Operate on synthetic vault copies in tests and retain provenance when deduplicating.
-3. Add three deterministic evaluation cases per skill including a negative case. Measure local-check against the offline CI target and record the clean-clone usability check when the needed environment is available.
-4. For the first integration, run skill validation over the skills actually present and carry forward the stage evidence. The final required inventory is SK-1 through SK-6 after C33.
-
-**Done when** SKE-SK1 and SKE-SK4 demonstrate three meaningful cases each and no leftover subprocess, lost provenance or secret output. The elapsed-time and environment evidence is recorded accurately.
-
-**Prompt**
-
-~~~text
-I am Aangir Doshi, the owner of C28. Apply the Shared Antigravity instructions. Read implementation plan sections 1, 2, 6 and the C28 entry before editing. Implement C28 local-check and brain-refine skill packages with valid cited SKILL.md files. Reuse build/test/stdio code and use fixture data. Test build or MCP failure with teardown, duplicate notes and repaired links. Record three deterministic evaluations per skill and the offline runtime. Update the C28 completion line using the actual verification results.
-~~~
-
-#### C29 Analyse playlists and deliver the audit skill
-
-**Owner** Harshil Srivastav · **Target** Mon 7 Dec 2026 (IST) · **Depends on** C10, C11, C19
-
-**SRS** FR-12, SK-0, SK-6, TQ-3, TQ-7 · **Implementation plan sections** 2, 3, 4, 6
-
-**Commit message** `feat(audit): analyse playlists and expose the audit skill`
-
-- [ ] Pending · Actual date (IST) — · Evidence — <!-- C29-status -->
-
-**Implementation**
-
-1. Register analyse_playlist and audit_playlist. Parse ID/URL, page up to 500 entries and batch detail lookups, including placeholders for unavailable IDs. Track truncation using the next-page signal. Retain read-only access and estimate the SRS quota before calls.
-2. Compute duration totals/distribution, top five channels, categories, languages and year range. Flag duplicates by ID or title cosine ≥0.90 and include age, duration, live/upcoming and unavailable flags. Support the five-year default, optional thresholds and safe display of missing metadata.
-3. Ship the playlist-audit skill, prompt and resource, calling estimate then audit and rendering a findings/fixes table. Test both tools over MCP and run three deterministic skill cases, including quota denial or inaccessible playlist.
-
-**Done when** ST-FR12 checks summary figures, placeholder handling and truncation. SKE-SK6 has three cases including a negative outcome. Both tools and skill produce zero writes and remain within bounded reads.
-
-**Prompt**
-
-~~~text
-I am Harshil Srivastav, the owner of C29. Apply the Shared Antigravity instructions. Read implementation plan sections 2, 3, 4, 6 and the C29 entry before editing. Implement C29 read-only playlist analysis and audit plus SK-6. Apply all FR-12 summaries, issue flags, thresholds, 500-item cap and quota formula. Expose the skill through MCP, check synthetic placeholders and duplicates, and verify cost, pagination and zero writes. Record three deterministic skill evaluations. Update the C29 completion line using the actual verification results.
-~~~
-
-#### C30 Recover partial writes and confirm undo
-
-**Owner** Ayush Patel · **Target** Mon 7 Dec 2026 (IST) · **Depends on** C21, C24, C25, C27
-
-**SRS** FR-5.10–5.11, FR-7.1–7.9, NFR-SAF, DB, TQ-4 · **Implementation plan sections** 2, 3, 5, 6
-
-**Commit message** `feat(playlist): recover partial writes and confirm undo`
-
-- [ ] Pending · Actual date (IST) — · Evidence — <!-- C30-status -->
-
-**Implementation**
+**SRS** FR-5.10–5.11, FR-7.1–7.9, NFR-SAF, DB, TQ-4
 
 1. Complete recovery for a recorded partial creation. Safely reconcile unexpected provider results using stored playlist and item progress. Resume through the existing proposal/confirmation interface, showing only the remaining insertions and obtaining a new signed approval before any retry.
 2. Implement undo_playlist as a read-only deletion proposal for an eligible playlist created by FocusList within retained history. Bind playlist identity and undo action to the proposal. Confirm separately and call delete once. Reject unrelated, expired, replayed or wrong-action requests and preserve audit data.
@@ -898,72 +773,114 @@ I am Harshil Srivastav, the owner of C29. Apply the Shared Antigravity instructi
 
 **Done when** ST-FR7 and ST-FR5 demonstrate interrupted creation, remaining-items-only resume and strictly scoped undo across fake restarts. Wrong, stale or declined approvals yield zero writes. Both teammates review.
 
-**Prompt**
-
-~~~text
-I am Ayush Patel, the owner of C30. Apply the Shared Antigravity instructions. Read implementation plan sections 2, 3, 5, 6 and the C30 entry before editing. Implement C30 confirmed recovery and undo using C27 write progress and C21 signing. Persist exactly what succeeded and reconcile unknown outcomes before resuming. Issue separately approved actions for remaining inserts or an eligible FocusList-created playlist deletion. Test replay, restart, tamper, unrelated playlist and no extra writes. Update the C30 completion line using the actual verification results.
-~~~
-
-#### C31 Gate pull requests and schedule live smoke checks
-
-**Owner** Aangir Doshi · **Target** Wed 9 Dec 2026 (IST) · **Depends on** C19, C22, C24–C30
-
-**SRS** TQ-5, TQ-6, SK-0, NFR-SEC, NFR-REL, NFR-PORT, SE, TBD-7, TBD-11 · **Implementation plan sections** 1, 3, 6, 7
-
-**Commit message** `ci(test): gate pull requests and isolate live smoke tests`
-
-- [ ] Pending · Actual date (IST) — · Evidence — <!-- C31-status -->
-
-**Implementation**
-
-1. Complete PR CI with build/lint/types, fixture unit/integration/MCP tests on at least two Python versions, import boundary, coverage thresholds, skill/note/reference checks, and quota/secret/personal-data/dependency checks. Make first-party regressions visible. Keep fixture/test mode enforced regardless of host credentials.
-2. Add a separate scheduled workflow using only provisioned test-account credentials and a runtime caps guard of at most 500 general units and five searches. Record current verified quota configuration and reauthorisation instructions. Use a small smoke sequence that fits the budget.
-3. Record required time/memory/coverage checks and workflow permissions or settings. Add an explicit skip/pending result when approved secrets or scheduled runs are unavailable. Test configuration evidence and the small live-work calculation without spending quota in PRs.
-4. Validate all skill files present and configure the final inventory check to cover all six once C32 and C33 are integrated. Treat any live job that has yet to run as pending evidence, never as a pass.
-
-**Done when** PR CI passes with no live network; coverage meets 80%/90% targets, or gaps are recorded and block completion. The scheduled workflow cannot be invoked by PRs and actual live evidence is only recorded when a real scheduled run happens. Final suite reruns after C32/C33.
+**Integration gate** Replace the legacy confirmation placeholder with the verified flow. Both teammates review FR-7 code. The same reviewed ordered IDs, title and visibility must reach the provider, and resume or undo always gets its own explicit approval.
 
 **Prompt**
 
 ~~~text
-I am Aangir Doshi, the owner of C31. Apply the Shared Antigravity instructions. Validate existing skill packages now and run the full inventory gate once C32 and C33 are integrated. Read implementation plan sections 1, 3, 6, 7 and the C31 entry before editing. Complete C31 fixture-only PR CI and a separately scheduled live smoke workflow. Enforce two Python versions, all SRS gates and targeted coverage, and keep secret access limited to actual scheduled runs with 500/5 caps. Verify offline enforcement and document authorised setup and pending live evidence separately. Update the C31 completion line using the actual verification results.
+I am Ayush Patel, the owner of C18. Apply the Shared Antigravity instructions. Read implementation plan sections 2, 3, 4, 5, 6, 7 and the entire C18 entry. Implement ordering, signed storage and claim, the human approval boundary, confirmed creation and recovery in that order. Include the exact approved action, at least 15 synthetic metadata attacks and zero-call/zero-write failure cases. Exercise replay and restart with fake time and mock writes. Work through every listed legacy workstream and its completion gate as one assignment. Update only the C18 completion line using actual verification results.
 ~~~
 
-#### C32 Deliver brain-ingest and verify read features
+#### C19 Publish scoring evidence and playlist audit
 
-**Owner** Harshil Srivastav · **Target** Wed 9 Dec 2026 (IST) · **Depends on** C14, C17, C20, C23, C26, C29, C31
+**Owner** Harshil Srivastav · **Target** Tue 8 Dec 2026 (IST) · **Depends on** C08, C10, C11, C14–C17
 
-**SRS** SK-0, SK-3, FR-1–FR-4, FR-6, FR-12, TQ-1–TQ-4, TQ-7, TQ-8 · **Implementation plan sections** 2, 4, 6
+**Workstreams** legacy C26, legacy C29 · **Implementation plan sections** 2, 3, 4, 5, 6, 7
 
-**Commit message** `feat(skills): add brain-ingest and complete read verification`
+**Commit message** `feat(analysis): explain rankings and deliver playlist audit`
 
-- [ ] Pending · Actual date (IST) — · Evidence — <!-- C32-status -->
+- [ ] Pending · Actual date (IST) — · Evidence — <!-- C19-status -->
 
-**Implementation**
+Finish FR-6 score explanations and measured ranking comparison. Deliver FR-12 analysis and SK-6 with bounded provider reads.
+
+<a id="c26-explain-scores-and-publish-ranking-evaluation"></a>
+##### Explain scores and publish ranking evaluation (legacy C26)
+
+**SRS** FR-6, FR-1–FR-3, FR-5 explanations, NFR-PERF, TBD-4, TBD-8
+
+1. Finish the shared deterministic score explanation for each ranking path. Return raw feature values, weights, contributions, up to five shared terms where relevant, missing-field names and a reason limited to 200 characters. Account reasons cite up to three contributing items or channels. Connect active weights to the scoring resource.
+2. Ensure each reported score matches its displayed contributions within 0.000001. Use an injected offline corpus or fixture metadata. Harmonise C15's reasons within the existing playlist proposal contract without changing its selection semantics.
+3. Run TF-IDF-only and weighted ranking over the same fixed labelled seed candidates from C08. Save per-seed and aggregate precision@5/MRR, reproducibility command and the ranking benchmark on the SRS environment when available. Record actual outcomes against the provisional target and any approved weight decision.
+
+**Done when** Explanations are deterministic and make zero provider calls. The fixture report covers at least 20 labelled seeds and shows actual metric values and parameters. Score, resource settings and documented chosen weights agree.
+
+<a id="c29-analyse-playlists-and-deliver-the-audit-skill"></a>
+##### Analyse playlists and deliver the audit skill (legacy C29)
+
+**SRS** FR-12, SK-0, SK-6, TQ-3, TQ-7
+
+1. Register analyse_playlist and audit_playlist. Parse ID/URL, page up to 500 entries and batch detail lookups, including placeholders for unavailable IDs. Track truncation using the next-page signal. Retain read-only access and estimate the SRS quota before calls.
+2. Compute duration totals/distribution, top five channels, categories, languages and year range. Flag duplicates by ID or title cosine ≥0.90 and include age, duration, live/upcoming and unavailable flags. Support the five-year default, optional thresholds and safe display of missing metadata.
+3. Ship the playlist-audit skill, prompt and resource, calling estimate then audit and rendering a findings/fixes table. Test both tools over MCP and run three deterministic skill cases, including quota denial or inaccessible playlist.
+
+**Done when** ST-FR12 checks summary figures, placeholder handling and truncation. SKE-SK6 has three cases including a negative outcome. Both tools and skill produce zero writes and remain within bounded reads.
+
+**Integration gate** Publish reproducible ranking and audit evidence for C20 and the `analyse_playlist` contract for C21. Record the provisional target delta and keep the frozen C08 comparison version identifiable.
+
+**Prompt**
+
+~~~text
+I am Harshil Srivastav, the owner of C19. Apply the Shared Antigravity instructions. Read implementation plan sections 2, 3, 4, 5, 6, 7 and the entire C19 entry. Finish the shared scoring trace and run both rankers over identical frozen candidates with real precision@5 and MRR outputs. Ship playlist analysis and audit with the capped read plan, checks for unavailable and duplicate items, and three fixture audit-skill evaluations. Work through every listed legacy workstream and its completion gate as one assignment. Update only the C19 completion line using actual verification results.
+~~~
+
+#### C20 Deliver brain-ingest and verify read features
+
+**Owner** Harshil Srivastav · **Target** Wed 9 Dec 2026 (IST) · **Depends on** C14, C16 fixture CI, C17, C19
+
+**Workstreams** legacy C32, legacy C34 · **Implementation plan sections** 2, 4, 6, 7
+
+**Commit message** `docs(readiness): deliver brain-ingest and verify read features`
+
+- [ ] Pending · Actual date (IST) — · Evidence — <!-- C20-status -->
+
+Deliver SK-3, complete the read-side fixture evidence and prepare the read-side part of the demo.
+
+<a id="c32-deliver-brain-ingest-and-verify-read-features"></a>
+##### Deliver brain-ingest and verify read features (legacy C32)
+
+**SRS** SK-0, SK-3, FR-1–FR-4, FR-6, FR-12, TQ-1–TQ-4, TQ-7, TQ-8
 
 1. Implement brain-ingest for supplied sources. Record source, author, date, type, status and SRS IDs, plus coherent evidence summary and uncertainty. Write the note in the inbox and update index/log while preserving existing entries and correct links.
 2. Add three deterministic skill cases, including missing source/fields or duplicate handling. Re-run scripted read MCP cases, with correct limit/runtime/scores, authorised context, unavailable and missing-input cases, and verify requirement links for all those provider-backed reads.
-3. Publish the read-side evidence and draft the Stage 3 review record. Add actual results and blockers for SK-2 and SK-5 when C33 reports them. Use a synthetic vault for verification.
+3. Publish the read-side evidence and draft the Stage 3 review record. Add actual results and blockers for SK-2 and SK-5 when C21 reports them. Use a synthetic vault for verification.
 
-**Done when** SKE-SK3 and all assigned read-side MCP checks pass, including missing fields and role-specific negative cases. Stage 3 review has reproducible evidence and shows any C33 or integration checks still pending.
+**Done when** SKE-SK3 and all assigned read-side MCP checks pass, including missing fields and role-specific negative cases. Stage 3 review has reproducible evidence and shows any C21 or integration checks still pending.
+
+<a id="c34-publish-ranking-and-analytics-demo-evidence"></a>
+##### Publish ranking and analytics demo evidence (legacy C34)
+
+**SRS** FR-1–FR-4, FR-6, FR-12, NFR-PERF, TQ-3, TBD-4
+
+1. Publish labelled-seed evaluation results, the exact reproduction command and metadata dictionary. Include score components, actual precision@5 and MRR, parameter versions and fixture performance readings. Report any missed target, missing field handling and timestamp caveat.
+2. Document runnable offline examples of similar videos/channels, personalised recommendations, comparison and audit, with sample synthetic inputs, expected response fields and current test identifiers.
+3. Rehearse the intelligence portion with the agreed client and one scripted client or MCP Inspector. Capture safe summaries of shown results and link issue, tests and notes.
+
+**Done when** The evidence can be regenerated from a clean setup and has no live personal data. At least one trace for each assigned feature demonstrates that output matches the SRS.
+
+**Integration gate** Record Stage 3 read-side results and open blockers. Hand the review draft and reproducible examples to C21 for SK-2/SK-5 results and C22 for the final release review.
 
 **Prompt**
 
 ~~~text
-I am Harshil Srivastav, the owner of C32. Apply the Shared Antigravity instructions. Read implementation plan sections 2, 4, 6 and the C32 entry before editing. Implement C32 brain-ingest with validated, attributed note records and index/log changes. Run three deterministic evaluations including a negative case. Verify and record MCP checks for FR-1–FR-4, FR-6 and FR-12, and stage-review evidence without claiming other owners’ tests have already passed. Update the C32 completion line using the actual verification results.
+I am Harshil Srivastav, the owner of C20. Apply the Shared Antigravity instructions. Read implementation plan sections 2, 4, 6, 7 and the entire C20 entry. Implement and evaluate brain-ingest with a synthetic vault. Rerun scripted read MCP cases, publish runnable read demo commands and measured evidence, and rehearse with the selected client and scripted client or MCP Inspector. Leave skills awaiting C21 explicitly pending. Work through every listed legacy workstream and its completion gate as one assignment. Update only the C20 completion line using actual verification results.
 ~~~
 
-#### C33 Deliver video-to-playlist and brain-query
+#### C21 Finish product skills and the curation demo
 
-**Owner** Ayush Patel · **Target** Wed 9 Dec 2026 (IST) · **Depends on** C14, C24, C27, C29, C30, C31, C32
+**Owner** Ayush Patel · **Target** Thu 10 Dec 2026 (IST) · **Depends on** C14, C16, C18–C20
 
-**SRS** SK-0, SK-2, SK-5, FR-1, FR-5, FR-7, FR-12, TQ-7 · **Implementation plan sections** 1, 2, 4, 5, 6
+**Workstreams** legacy C33, legacy C35 · **Implementation plan sections** 1, 2, 4, 5, 6, 7
 
-**Commit message** `feat(skills): deliver video-to-playlist and brain-query`
+**Commit message** `feat(skills): finish playlist workflow and curation demo`
 
-- [ ] Pending · Actual date (IST) — · Evidence — <!-- C33-status -->
+- [ ] Pending · Actual date (IST) — · Evidence — <!-- C21-status -->
 
-**Implementation**
+Deliver SK-2 and SK-5, complete the five-step course workflow and record end-to-end curation and safety evidence.
+
+<a id="c33-deliver-video-to-playlist-and-brain-query"></a>
+##### Deliver video-to-playlist and brain-query (legacy C33)
+
+**SRS** SK-0, SK-2, SK-5, FR-1, FR-5, FR-7, FR-12, TQ-7
 
 1. Package video-to-playlist and expose its MCP prompt/resource. Fetch and summarise seed metadata, get similar videos, collect constraints and propose. Show the exact list with constraints and cost, pause for explicit approval and call confirm in a separate interaction. Then call playlist analysis for a short result.
 2. Handle budget denial, decline, edit and missing details correctly. Re-propose after edits and keep untrusted metadata away from decisions. Package brain-query to answer with indexed note citations, identify evidence gaps and produce reviewable SRS/ADR drafts within the team PR process.
@@ -972,49 +889,10 @@ I am Harshil Srivastav, the owner of C32. Apply the Shared Antigravity instructi
 
 **Done when** Fixture MCP trace shows all five course skill steps with a real pause after proposal, unchanged review payload at confirmation and a final analysis. Negative cases make zero unapproved writes. SK-5 claims are tied to actual notes and drafts stay reviewable.
 
-**Prompt**
+<a id="c35-finish-the-curation-and-safety-walkthrough"></a>
+##### Finish the curation and safety walkthrough (legacy C35)
 
-~~~text
-I am Ayush Patel, the owner of C33. Apply the Shared Antigravity instructions. Read implementation plan sections 1, 2, 4, 5, 6 and the C33 entry before editing. Implement C33 video-to-playlist and brain-query packages following the SRS. Wire product MCP exposure, trigger final analysis only after successful creation, preserve separate explicit approval, and add three deterministic evaluations per skill. Verify decline/over-budget and missing evidence. Record stage findings honestly. Update the C33 completion line using the actual verification results.
-~~~
-
-### Stage 4 Demo and handoff · 10–11 December
-
-#### C34 Publish ranking and analytics demo evidence
-
-**Owner** Harshil Srivastav · **Target** Thu 10 Dec 2026 (IST) · **Depends on** C26, C29, C32
-
-**SRS** FR-1–FR-4, FR-6, FR-12, NFR-PERF, TQ-3, TBD-4 · **Implementation plan sections** 4, 6, 7
-
-**Commit message** `docs(results): publish ranking and analytics evidence`
-
-- [ ] Pending · Actual date (IST) — · Evidence — <!-- C34-status -->
-
-**Implementation**
-
-1. Publish labelled-seed evaluation results, the exact reproduction command and metadata dictionary. Include score components, actual precision@5 and MRR, parameter versions and fixture performance readings. Report any missed target, missing field handling and timestamp caveat.
-2. Document runnable offline examples of similar videos/channels, personalised recommendations, comparison and audit, with sample synthetic inputs, expected response fields and current test identifiers.
-3. Rehearse the intelligence portion with the agreed client and one scripted client or MCP Inspector. Capture safe summaries of shown results and link issue, tests and notes.
-
-**Done when** The evidence can be regenerated from a clean setup and has no live personal data. At least one trace for each assigned feature demonstrates that output matches the SRS.
-
-**Prompt**
-
-~~~text
-I am Harshil Srivastav, the owner of C34. Apply the Shared Antigravity instructions. Read implementation plan sections 4, 6, 7 and the C34 entry before editing. Publish C34’s read-side demo and verification report using the measured C26/C32 evidence. Add runnable fixture examples and metadata definitions, cite tests and research notes, and report actual client rehearsal status and performance numbers. Avoid unrelated code changes. Update the C34 completion line using the actual verification results.
-~~~
-
-#### C35 Finish the curation and safety walkthrough
-
-**Owner** Ayush Patel · **Target** Thu 10 Dec 2026 (IST) · **Depends on** C27–C34
-
-**SRS** FR-5, FR-7, FR-8, SK-2, SK-5, SE, SB, TBD-1, TBD-9 · **Implementation plan sections** 5, 6, 7
-
-**Commit message** `docs(demo): finalise the curation and safety walkthrough`
-
-- [ ] Pending · Actual date (IST) — · Evidence — <!-- C35-status -->
-
-**Implementation**
+**SRS** FR-5, FR-7, FR-8, SK-2, SK-5, SE, SB, TBD-1, TBD-9
 
 1. Write the team curation demonstration script from natural-language request to final summary. Include a two-hour target, per-item cap, language, exact reviewed proposal and cost, confirmation, expected playlist result, decline/edit, quota rejection and controlled partial/undo fallback.
 2. Close traceability links across requirement, issue, PR, test, skill and note using actual records. Record Stage 4 review, role-specific demonstration responsibilities and significant AI-session notes. Record genuine learner-display, item-count and consent evidence or leave the relevant TBD open.
@@ -1022,23 +900,44 @@ I am Harshil Srivastav, the owner of C34. Apply the Shared Antigravity instructi
 
 **Done when** The fixture walkthrough is repeatable. Each expected action has a required confirmation plus observable write/zero-write evidence. Traceability entries use real links and document open items.
 
+**Integration gate** Attach actual Stage 3 skill and Stage 4 demo results, traceability and any live prerequisites for C22. Both teammates review any FR-7 code changes.
+
 **Prompt**
 
 ~~~text
-I am Ayush Patel, the owner of C35. Apply the Shared Antigravity instructions. Read implementation plan sections 5, 6, 7 and the C35 entry before editing. Write C35’s final curation and safety runbook with inputs, expected results and consent transitions, including fallback and recovery. Finish traceability based on real evidence and publish the Stage 4 review. Rehearse the fixture workflow and record actual results. Keep external live actions pending unless separately approved. Update the C35 completion line using the actual verification results.
+I am Ayush Patel, the owner of C21. Apply the Shared Antigravity instructions. Read implementation plan sections 1, 2, 4, 5, 6, 7 and the entire C21 entry. Package both skills, verify separate approval and unchanged payload in the five-step fixture trace, and exercise three evaluations per skill. Complete the curation and recovery runbook, rehearse it and record only verified demo and traceability evidence. Work through every listed legacy workstream and its completion gate as one assignment. Update only the C21 completion line using actual verification results.
 ~~~
 
-#### C36 Prepare the FocusList release
+#### C22 Close CI verification and prepare the release
 
-**Owner** Aangir Doshi · **Target** Fri 11 Dec 2026 (IST) · **Depends on** C31–C35
+**Owner** Aangir Doshi · **Target** Fri 11 Dec 2026 (IST) · **Depends on** C16–C21
 
-**SRS** UI-2–UI-5, SE, L-1–L-6, SK-1, TQ-1–TQ-8, TBD-5, TBD-7, TBD-11 · **Implementation plan sections** 1, 2, 3, 6, 7
+**Workstreams** legacy C31, legacy C36 · **Implementation plan sections** 1, 2, 3, 6, 7
 
-**Commit message** `chore(release): prepare FocusList 1.0`
+**Commit message** `chore(release): verify and prepare FocusList 1.0`
 
-- [ ] Pending · Actual date (IST) — · Evidence — <!-- C36-status -->
+- [ ] Pending · Actual date (IST) — · Evidence — <!-- C22-status -->
 
-**Implementation**
+Complete the CI and scheduled smoke requirements and verify the full release from a clean clone.
+
+<a id="c31-gate-pull-requests-and-schedule-live-smoke-checks"></a>
+##### Gate pull requests and schedule live smoke checks (legacy C31)
+
+**SRS** TQ-5, TQ-6, SK-0, NFR-SEC, NFR-REL, NFR-PORT, SE, TBD-7, TBD-11
+
+1. Complete PR CI with build/lint/types, fixture unit/integration/MCP tests on at least two Python versions, import boundary, coverage thresholds, skill/note/reference checks, and quota/secret/personal-data/dependency checks. Make first-party regressions visible. Keep fixture/test mode enforced regardless of host credentials.
+2. Add a separate scheduled workflow using only provisioned test-account credentials and a runtime caps guard of at most 500 general units and five searches. Record current verified quota configuration and reauthorisation instructions. Use a small smoke sequence that fits the budget.
+3. Record required time/memory/coverage checks and workflow permissions or settings. Add an explicit skip/pending result when approved secrets or scheduled runs are unavailable. Test configuration evidence and the small live-work calculation without spending quota in PRs.
+4. Validate all skill files present and configure the final inventory check to cover all six once C20 and C21 are integrated. Treat any live job that has yet to run as pending evidence, never as a pass.
+
+**Done when** PR CI passes with no live network; coverage meets 80%/90% targets, or gaps are recorded and block completion. The scheduled workflow cannot be invoked by PRs and actual live evidence is only recorded when a real scheduled run happens. Final suite reruns after C20/C21.
+
+Continue from the opening fixture gate in C16. After the six-skill integration in C21, enable or enforce the final inventory and coverage gates with the release suite. Do not run or enable scheduled live work without the approved credentials and quota limits.
+
+<a id="c36-prepare-the-focuslist-release"></a>
+##### Prepare the FocusList release (legacy C36)
+
+**SRS** UI-2–UI-5, SE, L-1–L-6, SK-1, TQ-1–TQ-8, TBD-5, TBD-7, TBD-11
 
 1. Publish README/quick start, developer/provider and fixture guide, generated MCP reference, user guide, privacy note, changelog, licence records and branding/non-endorsement notice. Confirm the implemented CLI includes help plus safe auth, doctor, quota, purge and developer-only fixture recording support. Add missing documented verification in the relevant implementation branch if needed.
 2. Run a fresh-clone fixture local-check and final CI across FR-1–FR-12, skills, security tests and quota/account boundaries. Collect traceable benchmarks and coverage. Check actual demo client compatibility and Testing-mode reauthorisation using an approved test account where available. Record any pending authorised live evidence.
@@ -1046,10 +945,12 @@ I am Ayush Patel, the owner of C35. Apply the Shared Antigravity instructions. R
 
 **Done when** Every applicable required check has factual evidence. The fixture course workflow works end to end. Published docs match generated schemas and current behaviours. Release readiness, external results and tag status are documented without mixing them with local test success.
 
+**Integration gate** Apply and verify the final all-skill and coverage gates. Treat any absent approved account, credential, scheduled run or external proof as pending. Tag after the reviewed release reaches `main`, with owner authorisation.
+
 **Prompt**
 
 ~~~text
-I am Aangir Doshi, the owner of C36. Apply the Shared Antigravity instructions. Read implementation plan sections 1, 2, 3, 6, 7 and the C36 entry before editing. Prepare C36 FocusList 1.0 release documentation and verify the integrated repo from a clean clone. Run local-check, course workflow, coverage and security verification, confirm published docs and traceability match code, and record actual test results or authorised live dependencies. Leave tagging and submission for the owner after review. Update the C36 completion line using the actual verification results.
+I am Aangir Doshi, the owner of C22. Apply the Shared Antigravity instructions. Read implementation plan sections 1, 2, 3, 6, 7 and the entire C22 entry. Finish the final offline CI and isolated scheduled smoke workstream, rerun the full fixture suite and six-skill inventory, and collect benchmark, coverage and release evidence. Check doc/schema parity and keep authorisation-dependent checks and the tag status explicit. Work through every listed legacy workstream and its completion gate as one assignment. Update only the C22 completion line using actual verification results.
 ~~~
 
 ## Source files
