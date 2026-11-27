@@ -29,6 +29,11 @@ class VideoProvider(ABC):
         ...
 
     @abstractmethod
+    def search_channel_ids(self, query: str, max_results: int = 50) -> list[str]:
+        """Read at most one search page of channel IDs, without fetching channel details."""
+        ...
+
+    @abstractmethod
     def get_channel_upload_ids(self, channel_id: str, max_results: int = 50) -> list[str]:
         """Resolve the uploads playlist and read at most one page of video IDs."""
         ...
@@ -40,6 +45,11 @@ class VideoProvider(ABC):
         handle: str | None = None,
     ) -> ChannelRecord | None:
         """Resolve channel metadata and public statistics (costs 1 unit)."""
+        ...
+
+    @abstractmethod
+    def get_channels_details(self, channel_ids: list[str]) -> list[ChannelRecord]:
+        """Fetch metadata for up to 50 channels in one batched call (costs 1 unit)."""
         ...
 
     @abstractmethod
@@ -76,6 +86,15 @@ class VideoProvider(ABC):
         max_results: int = 50,
     ) -> list[dict[str, Any]]:
         """Fetch authorized learner's owned playlists (costs 1 unit per 50 items)."""
+        ...
+
+    @abstractmethod
+    def get_playlist_items(
+        self,
+        playlist_id: str,
+        max_results: int = 100,
+    ) -> list[AccountActivityRecord]:
+        """Fetch entries in a playlist (costs 1 unit per 50 items)."""
         ...
 
     @abstractmethod

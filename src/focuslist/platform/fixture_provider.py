@@ -34,6 +34,10 @@ class FixtureVideoProvider(VideoProvider):
         self._channels: dict[str, ChannelRecord] = {}
         self._categories: list[dict[str, Any]] = []
         self._created_playlists: dict[str, dict[str, Any]] = {}
+        self._likes: list[AccountActivityRecord] | None = None
+        self._subscriptions: list[AccountActivityRecord] | None = None
+        self._playlists: list[dict[str, Any]] | None = None
+        self._playlist_items: dict[str, list[AccountActivityRecord]] = {}
         self._load_fixtures()
 
     def reset_counters(self) -> None:
@@ -90,6 +94,28 @@ class FixtureVideoProvider(VideoProvider):
             with open(categories_file, "r", encoding="utf-8") as f:
                 self._categories = json.load(f)
 
+        likes_file = self.fixture_dir / "sample_likes.json"
+        if likes_file.exists():
+            with open(likes_file, "r", encoding="utf-8") as f:
+                self._likes = [AccountActivityRecord(**item) for item in json.load(f)]
+
+        subs_file = self.fixture_dir / "sample_subscriptions.json"
+        if subs_file.exists():
+            with open(subs_file, "r", encoding="utf-8") as f:
+                self._subscriptions = [AccountActivityRecord(**item) for item in json.load(f)]
+
+        playlists_file = self.fixture_dir / "sample_playlists.json"
+        if playlists_file.exists():
+            with open(playlists_file, "r", encoding="utf-8") as f:
+                self._playlists = json.load(f)
+
+        playlist_items_file = self.fixture_dir / "sample_playlist_items.json"
+        if playlist_items_file.exists():
+            with open(playlist_items_file, "r", encoding="utf-8") as f:
+                raw_items = json.load(f)
+                for pid, items in raw_items.items():
+                    self._playlist_items[pid] = [AccountActivityRecord(**item) for item in items]
+
     def get_video_details(self, video_ids: list[str]) -> list[VideoRecord]:
         self._record_call("get_video_details", video_ids=list(video_ids))
         results: list[VideoRecord] = []
@@ -108,6 +134,24 @@ class FixtureVideoProvider(VideoProvider):
             return []
         self._record_call("search_video_ids", query=query, max_results=cap)
         return [record.video_id for record in self._search_records(query, cap)]
+
+    def search_channel_ids(self, query: str, max_results: int = 50) -> list[str]:
+        cap = min(50, max(0, max_results))
+        if not cap:
+            return []
+        self._record_call("search_channel_ids", query=query, max_results=cap)
+        q_lower = query.lower()
+        ordered = sorted(self._channels.values(), key=lambda c: c.channel_id)
+        matched = [
+            c.channel_id
+            for c in ordered
+            if q_lower in c.title.lower()
+            or (c.description and q_lower in c.description.lower())
+            or any(q_lower in kw.lower() for kw in c.keywords or ())
+        ]
+        if not matched:
+            matched = [c.channel_id for c in ordered]
+        return matched[:cap]
 
     def _search_records(self, query: str, max_results: int) -> list[VideoRecord]:
         q_lower = query.lower()
@@ -139,6 +183,14 @@ class FixtureVideoProvider(VideoProvider):
                     return c
         return None
 
+    def get_channels_details(self, channel_ids: list[str]) -> list[ChannelRecord]:
+        self._record_call("get_channels_details", channel_ids=list(channel_ids))
+        results: list[ChannelRecord] = []
+        for cid in channel_ids:
+            if cid in self._channels:
+                results.append(self._channels[cid])
+        return results
+
     def get_channel_recent_uploads(
         self,
         channel_id: str,
@@ -168,6 +220,11 @@ class FixtureVideoProvider(VideoProvider):
         max_results: int = 200,
     ) -> list[AccountActivityRecord]:
         self._record_call("get_user_likes", account_id=account_id, max_results=max_results)
+        if self._likes is not None:
+            return [
+                r.model_copy(update={"account_id": account_id})
+                for r in self._likes[:max_results]
+            ]
         ordered_videos = sorted(self._videos.values(), key=lambda v: v.video_id)
         return [
             AccountActivityRecord(
@@ -175,7 +232,7 @@ class FixtureVideoProvider(VideoProvider):
                 activity_type="like",
                 account_id=account_id,
                 channel_id=v.channel_id,
-                timestamp_provenance="genuine",
+                timestamp_provenance="unknown",
             )
             for v in ordered_videos[:max_results]
         ]
@@ -188,6 +245,11 @@ class FixtureVideoProvider(VideoProvider):
         self._record_call(
             "get_user_subscriptions", account_id=account_id, max_results=max_results
         )
+        if self._subscriptions is not None:
+            return [
+                r.model_copy(update={"account_id": account_id})
+                for r in self._subscriptions[:max_results]
+            ]
         ordered_channels = sorted(self._channels.values(), key=lambda c: c.channel_id)
         return [
             AccountActivityRecord(
@@ -195,7 +257,7 @@ class FixtureVideoProvider(VideoProvider):
                 activity_type="subscription",
                 account_id=account_id,
                 channel_id=c.channel_id,
-                timestamp_provenance="genuine",
+                timestamp_provenance="unknown",
             )
             for c in ordered_channels[:max_results]
         ]
@@ -206,6 +268,8 @@ class FixtureVideoProvider(VideoProvider):
         max_results: int = 50,
     ) -> list[dict[str, Any]]:
         self._record_call("get_user_playlists", account_id=account_id, max_results=max_results)
+        if self._playlists is not None:
+            return list(self._playlists[:max_results])
         return [
             {
                 "playlist_id": pid,
@@ -215,6 +279,30 @@ class FixtureVideoProvider(VideoProvider):
             }
             for pid, p in sorted(self._created_playlists.items())
         ][:max_results]
+
+    def get_playlist_items(
+        self,
+        playlist_id: str,
+        max_results: int = 100,
+    ) -> list[AccountActivityRecord]:
+        cap = min(100, max(0, max_results))
+        self._record_call("get_playlist_items", playlist_id=playlist_id, max_results=cap)
+        if playlist_id in self._playlist_items:
+            return list(self._playlist_items[playlist_id][:cap])
+        if playlist_id in self._created_playlists:
+            items = self._created_playlists[playlist_id]["items"][:cap]
+            return [
+                AccountActivityRecord(
+                    item_id=vid,
+                    activity_type="playlist_entry",
+                    account_id="fixture_learner",
+                    playlist_id=playlist_id,
+                    playlist_item_id=f"{playlist_id}_item_{idx + 1}",
+                    timestamp_provenance="unknown",
+                )
+                for idx, vid in enumerate(items)
+            ]
+        return []
 
     def get_categories(self, region_code: str = "US") -> list[dict[str, Any]]:
         self._record_call("get_categories", region_code=region_code)

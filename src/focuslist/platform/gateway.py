@@ -347,6 +347,14 @@ class ProviderGateway(VideoProvider):
             expected_searches=1,
         )
 
+    def search_channel_ids(self, query: str, max_results: int = 50) -> list[str]:
+        return self._execute_with_accounting(
+            "search_channel_ids",
+            lambda: self.provider.search_channel_ids(query, max_results=max_results),
+            expected_units=0,
+            expected_searches=1,
+        )
+
     def get_channel_upload_ids(self, channel_id: str, max_results: int = 50) -> list[str]:
         return self._execute_with_accounting(
             "get_channel_upload_ids",
@@ -381,6 +389,53 @@ class ProviderGateway(VideoProvider):
             )
             return norm
         return record
+
+    def get_channels_details(self, channel_ids: list[str]) -> list[ChannelRecord]:
+        deduped = list(dict.fromkeys(cid for cid in channel_ids if cid))
+        if not deduped:
+            return []
+
+        cached_by_id: dict[str, ChannelRecord] = {}
+        missing_ids: list[str] = []
+        if self.cache_enabled:
+            for cid in deduped:
+                cached = self.storage.get_cache(
+                    "channel_detail", {"channel_id": cid, "handle": None}, category="channel"
+                )
+                if cached is not None:
+                    cached_by_id[cid] = normalise_channel_record(ChannelRecord(**cached))
+                else:
+                    missing_ids.append(cid)
+            if cached_by_id:
+                self._record_cache_hit(len(cached_by_id))
+        else:
+            missing_ids = deduped
+
+        fetched_by_id: dict[str, ChannelRecord] = {}
+        if missing_ids:
+            batches = max(1, (len(missing_ids) + _MAX_BATCH_SIZE - 1) // _MAX_BATCH_SIZE)
+            records = self._execute_with_accounting(
+                "get_channels_details",
+                lambda: self.provider.get_channels_details(missing_ids),
+                expected_units=batches,
+                expected_searches=0,
+            )
+            for rec in records:
+                norm = normalise_channel_record(rec)
+                fetched_by_id[norm.channel_id] = norm
+                if self.cache_enabled:
+                    self.storage.set_cache(
+                        "channel_detail",
+                        {"channel_id": norm.channel_id, "handle": None},
+                        "channel",
+                        norm.model_dump(mode="json"),
+                    )
+
+        return [
+            cached_by_id[cid] if cid in cached_by_id else fetched_by_id[cid]
+            for cid in deduped
+            if cid in cached_by_id or cid in fetched_by_id
+        ]
 
     def get_channel_recent_uploads(
         self,
@@ -479,6 +534,20 @@ class ProviderGateway(VideoProvider):
                 "user_playlists", params, "user", playlists, account_id=account_id
             )
         return playlists
+
+    def get_playlist_items(
+        self,
+        playlist_id: str,
+        max_results: int = 100,
+    ) -> list[AccountActivityRecord]:
+        cap = max(1, min(max_results, 100))
+        pages = max(1, (cap + _MAX_BATCH_SIZE - 1) // _MAX_BATCH_SIZE)
+        return self._execute_with_accounting(
+            "get_playlist_items",
+            lambda: self.provider.get_playlist_items(playlist_id, max_results=cap),
+            expected_units=pages,
+            expected_searches=0,
+        )
 
     def get_categories(self, region_code: str = "US") -> list[dict[str, Any]]:
         params = {"region_code": region_code}

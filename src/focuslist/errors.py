@@ -21,6 +21,7 @@ class ErrorCode(str, Enum):
     AUTH_EXPIRED = "AUTH_EXPIRED"
     AUTH_CANCELLED = "AUTH_CANCELLED"
     NO_YOUTUBE_CHANNEL = "NO_YOUTUBE_CHANNEL"
+    NO_PROFILE_DATA = "NO_PROFILE_DATA"
     CONFIRMATION_INVALID = "CONFIRMATION_INVALID"
     CONFIRMATION_EXPIRED = "CONFIRMATION_EXPIRED"
     PARTIALLY_CREATED = "PARTIALLY_CREATED"
@@ -89,6 +90,11 @@ ERROR_REGISTRY: dict[ErrorCode, tuple[str, str, bool]] = {
     ErrorCode.NO_YOUTUBE_CHANNEL: (
         "The authenticated Google account does not have an active YouTube channel.",
         "Create a YouTube channel for this account at youtube.com to enable playlist creation.",
+        False,
+    ),
+    ErrorCode.NO_PROFILE_DATA: (
+        "No usable activity data was found in the selected authorised sources.",
+        "Select additional sources (likes, subscriptions, or playlists) or like/save videos on YouTube.",
         False,
     ),
     ErrorCode.CONFIRMATION_INVALID: (
@@ -218,6 +224,11 @@ class AuthCancelledError(FocusListError):
 class NoYouTubeChannelError(FocusListError):
     def __init__(self, message: str | None = None, details: dict[str, Any] | None = None) -> None:
         super().__init__(ErrorCode.NO_YOUTUBE_CHANNEL, message, details=details)
+
+
+class NoProfileDataError(FocusListError):
+    def __init__(self, message: str | None = None, details: dict[str, Any] | None = None) -> None:
+        super().__init__(ErrorCode.NO_PROFILE_DATA, message, details=details)
 
 
 class ConfirmationInvalidError(FocusListError):

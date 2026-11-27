@@ -353,9 +353,25 @@ class LiveVideoProvider(VideoProvider):
             return []
         self.call_counts["search_video_ids"] += 1
         self.requests += 1
-        return self._search_ids(query, min(max_results, _MAX_BATCH_SIZE))
+        return self._search_ids(query, min(max_results, _MAX_BATCH_SIZE), kind="video", id_field="videoId")
 
-    def _search_ids(self, query: str, cap: int) -> list[str]:
+    def search_channel_ids(self, query: str, max_results: int = 50) -> list[str]:
+        if max_results <= 0:
+            return []
+        self.call_counts["search_channel_ids"] += 1
+        self.requests += 1
+        return self._search_ids(
+            query, min(max_results, _MAX_BATCH_SIZE), kind="channel", id_field="channelId"
+        )
+
+    def _search_ids(
+        self,
+        query: str,
+        cap: int,
+        *,
+        kind: str = "video",
+        id_field: str = "videoId",
+    ) -> list[str]:
         service = self._ensure_service()
         collected_ids: list[str] = []
         page_token: str | None = None
@@ -367,7 +383,7 @@ class LiveVideoProvider(VideoProvider):
             kwargs: dict[str, Any] = {
                 "part": "snippet",
                 "q": query,
-                "type": "video",
+                "type": kind,
                 "maxResults": page_size,
             }
             if page_token:
@@ -375,9 +391,9 @@ class LiveVideoProvider(VideoProvider):
             resp = self._execute_request("search.list", service.search().list(**kwargs))
             pages_used += 1
             for item in resp.get("items", []):
-                vid = (item.get("id") or {}).get("videoId") if isinstance(item, dict) else None
-                if isinstance(vid, str) and vid and vid not in collected_ids:
-                    collected_ids.append(vid)
+                found_id = (item.get("id") or {}).get(id_field) if isinstance(item, dict) else None
+                if isinstance(found_id, str) and found_id and found_id not in collected_ids:
+                    collected_ids.append(found_id)
                     if len(collected_ids) >= cap:
                         break
             page_token = resp.get("nextPageToken")
@@ -385,6 +401,28 @@ class LiveVideoProvider(VideoProvider):
                 break
 
         return collected_ids
+
+    def _map_channel_item(self, item: dict[str, Any]) -> ChannelRecord:
+        cid = str(item.get("id") or "")
+        snippet = item.get("snippet") or {}
+        stats = item.get("statistics") or {}
+        topics = (item.get("topicDetails") or {}).get("topicCategories") or []
+        hidden = bool(stats.get("hiddenSubscriberCount", False))
+        record = ChannelRecord(
+            channel_id=cid,
+            canonical_url=f"https://www.youtube.com/channel/{cid}",
+            title=sanitize_untrusted_text(snippet.get("title") or ""),
+            handle=snippet.get("customUrl"),
+            description=snippet.get("description"),
+            language=snippet.get("defaultLanguage"),
+            language_provenance="metadata" if snippet.get("defaultLanguage") else "unknown",
+            topic_categories=[str(t) for t in topics],
+            subscriber_count=None if hidden else _safe_int(stats.get("subscriberCount")),
+            video_count=_safe_int(stats.get("videoCount")),
+            hidden_subscriber_count=hidden,
+            untrusted=True,
+        )
+        return normalise_channel_record(record)
 
     def get_channel_details(
         self,
@@ -409,29 +447,30 @@ class LiveVideoProvider(VideoProvider):
         items = resp.get("items", [])
         if not items or not isinstance(items[0], dict):
             return None
+        return self._map_channel_item(items[0])
 
-        item = items[0]
-        cid = str(item.get("id") or "")
-        snippet = item.get("snippet") or {}
-        stats = item.get("statistics") or {}
-        topics = (item.get("topicDetails") or {}).get("topicCategories") or []
-        hidden = bool(stats.get("hiddenSubscriberCount", False))
-
-        record = ChannelRecord(
-            channel_id=cid,
-            canonical_url=f"https://www.youtube.com/channel/{cid}",
-            title=sanitize_untrusted_text(snippet.get("title") or ""),
-            handle=snippet.get("customUrl"),
-            description=snippet.get("description"),
-            language=snippet.get("defaultLanguage"),
-            language_provenance="metadata" if snippet.get("defaultLanguage") else "unknown",
-            topic_categories=[str(t) for t in topics],
-            subscriber_count=None if hidden else _safe_int(stats.get("subscriberCount")),
-            video_count=_safe_int(stats.get("videoCount")),
-            hidden_subscriber_count=hidden,
-            untrusted=True,
-        )
-        return normalise_channel_record(record)
+    def get_channels_details(self, channel_ids: list[str]) -> list[ChannelRecord]:
+        clean_ids = list(dict.fromkeys(cid for cid in channel_ids if cid))
+        if not clean_ids:
+            return []
+        self.call_counts["get_channels_details"] += 1
+        self.requests += 1
+        service = self._ensure_service()
+        records: list[ChannelRecord] = []
+        for idx in range(0, len(clean_ids), _MAX_BATCH_SIZE):
+            batch = clean_ids[idx : idx + _MAX_BATCH_SIZE]
+            resp = self._execute_request(
+                "channels.list",
+                service.channels().list(
+                    part="snippet,statistics,topicDetails",
+                    id=",".join(batch),
+                ),
+                is_channel=True,
+            )
+            for item in resp.get("items", []):
+                if isinstance(item, dict):
+                    records.append(self._map_channel_item(item))
+        return records
 
     def get_channel_recent_uploads(
         self,
@@ -614,6 +653,55 @@ class LiveVideoProvider(VideoProvider):
                 }
             )
         return playlists
+
+    def get_playlist_items(
+        self,
+        playlist_id: str,
+        max_results: int = 100,
+    ) -> list[AccountActivityRecord]:
+        self.call_counts["get_playlist_items"] += 1
+        self.requests += 1
+        service = self._ensure_service()
+        cap = max(1, min(max_results, 100))
+        records: list[AccountActivityRecord] = []
+        page_token: str | None = None
+
+        while len(records) < cap:
+            page_size = min(_MAX_BATCH_SIZE, cap - len(records))
+            kwargs: dict[str, Any] = {
+                "part": "snippet,contentDetails",
+                "playlistId": playlist_id,
+                "maxResults": page_size,
+            }
+            if page_token:
+                kwargs["pageToken"] = page_token
+            resp = self._execute_request("playlistItems.list", service.playlistItems().list(**kwargs))
+            for item in resp.get("items", []):
+                if not isinstance(item, dict):
+                    continue
+                snippet = item.get("snippet") or {}
+                content = item.get("contentDetails") or {}
+                vid = content.get("videoId") or (snippet.get("resourceId") or {}).get("videoId")
+                if isinstance(vid, str) and vid:
+                    ts = _parse_optional_utc(snippet.get("publishedAt"))
+                    records.append(
+                        AccountActivityRecord(
+                            item_id=vid,
+                            activity_type="playlist_entry",
+                            account_id="authenticated",
+                            timestamp=ts,
+                            timestamp_provenance="genuine" if ts is not None else "unknown",
+                            channel_id=snippet.get("videoOwnerChannelId"),
+                            playlist_id=playlist_id,
+                            playlist_item_id=str(item.get("id") or "") or None,
+                        )
+                    )
+                    if len(records) >= cap:
+                        break
+            page_token = resp.get("nextPageToken")
+            if not page_token:
+                break
+        return records
 
     def get_categories(self, region_code: str = "US") -> list[dict[str, Any]]:
         self.call_counts["get_categories"] += 1
