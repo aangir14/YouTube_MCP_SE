@@ -13,6 +13,16 @@ from focuslist.context import RequestContext
 from focuslist.platform.fixture_provider import FixtureVideoProvider
 
 
+@pytest.fixture(autouse=True)
+def _isolate_storage_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Isolate SQLite DB and credential storage per test so repo root stays clean."""
+    monkeypatch.setenv("FOCUSLIST_DB_PATH", str(tmp_path / "isolated_focuslist.db"))
+    monkeypatch.setenv("FOCUSLIST_AUTH_STORE_DIR", str(tmp_path / "isolated_auth"))
+    from focuslist.config import get_settings
+
+    get_settings(reset=True)
+
+
 @pytest.fixture
 def fake_clock() -> FakeClock:
     """Fixture providing a deterministic clock anchored at 2026-11-23 12:00:00 UTC."""

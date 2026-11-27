@@ -6,6 +6,18 @@ This append-only log tracks additions, modifications, decision milestones, and s
 
 ## Chronological Change Log
 
+### 2026-11-27 · Commit C16: Platform Storage, Quota, OAuth, Write Primitives, Skills, and Fixture PR Gate
+- **Author**: Aangir Doshi (BT2024078)
+- **Commit Reference**: C16 (`feat(platform): integrate storage quota OAuth and offline checks`)
+- **SRS Scope**: FR-5.9–5.14, FR-7, FR-9, FR-10, FR-11, DB-1–DB-3, SK-0, SK-1, SK-4, TQ-4–TQ-7, TBD-6, TBD-7, TBD-11
+- **Changes Delivered**:
+  1. **SQLite Cache & Transactional State (`src/focuslist/platform/storage.py`)**: Added idempotent migrations, WAL + foreign keys, SRS TTLs (24h/6h/7d/30d max), proposal (`+7d`) and append-only action/ledger (`30d`) retention, startup/daily local cleanup, account-scoped purge, atomic `BEGIN IMMEDIATE` proposal claims, and wired `focuslist purge`.
+  2. **Quota Admission & Gateway (`src/focuslist/platform/quota.py`, `gateway.py`)**: Centralized method/operation costs (TBD-11 baseline), Pacific DST rollover (`src/focuslist/clock.py`), atomic reservation/release, COM-5 retry budget charging, exhaustion stops, zero-cost cache hits, local `estimate_quota`/`get_quota_status`/`focuslist quota`, and wired C15 proposals + FR-1 discovery to observed accounting.
+  3. **Least-Privilege Google OAuth (`src/focuslist/platform/auth.py`)**: Implemented PKCE + `127.0.0.1` ephemeral loopback listener with state validation, `youtube.readonly` initial login and write-scope gating (`youtube.force-ssl`), external config validation, OS keyring / `0600` file store separate from SQLite, auto-refresh, day-5 Testing-mode warning, `invalid_grant` purge, logout revocation/purge, and `SecretRedactingFilter`.
+  4. **Bounded Write Primitives & Confirmation Guard (`src/focuslist/platform/write_contracts.py`, `live_provider.py`, `server.py`)**: Added `WriteAuthorizationContext`, `AmbiguousWriteError`, `playlists.insert`, `playlistItems.insert`, `playlists.delete`, and channel checks in `LiveVideoProvider`; guarded `confirm_playlist` and `undo_playlist` fail-closed with zero writes until C18 integration.
+  5. **Skills (`skills/local-check/`, `skills/brain-refine/`, `src/focuslist/skills/`)**: Packaged `local-check` (SK-1) and `brain-refine` (SK-4) with `SK-0`/`TBD-10` validation and three deterministic evaluations each (`SKE-SK1`, `SKE-SK4`), plus `--local-check` on `focuslist doctor`.
+  6. **Opening Fixture PR CI Gate (`.github/workflows/pr-fixture-ci.yml`, `compliance.py`, `ADR-006`)**: Added 2-Python (`3.11`/`3.12`) offline fixture workflow, import-boundary/secret/skill checks, generated `docs/reference/mcp-reference.md`, `ADR-006`, and `docs/testing/c16-platform-and-skills-evidence.md`.
+
 ### 2026-11-26 · Commit C15: Read-Only Playlist Proposal Service
 - **Author**: Ayush Patel (BT2024171)
 - **Commit Reference**: C15 (`feat(playlist): build read-only constraint proposals`)
@@ -102,6 +114,15 @@ This append-only log tracks additions, modifications, decision milestones, and s
 ---
 
 ## AI Session Records (SB-1, SB-5, SE-5)
+
+### Session C16-S01: Platform Storage, Quota, OAuth, Write Primitives, Skills, and Opening CI Gate
+- **Date**: 2026-11-27 (IST)
+- **Teammate / Operator**: Aangir Doshi (BT2024078)
+- **AI Model**: Antigravity (Gemini 4 Hydrogen High)
+- **Assignment**: [C16](../FocusList_Commit_Plan.md#c16-build-the-platform-and-offline-checks), covering legacy C16, C19, C22, C25, C28, and opening fixture CI gate from legacy C31.
+- **Decisions and Contracts**: Published [ADR-006](../docs/adr/ADR-006-platform-storage-quota-and-write-contracts.md) pinning reusable SQLite, quota, OAuth, and `WriteAuthorizationContext` / `AmbiguousWriteError` contracts for C17/C18, verified TBD-11 baseline costs, documented TBD-7 Testing-mode prerequisites, and guarded `confirm_playlist`/`undo_playlist` fail-closed pending C18.
+- **Verification**: `python -m ruff check .` clean (`All checks passed!`), `FOCUSLIST_PROVIDER=fixture python -m pytest -v` passed all 231 tests in 32.09s, `run_fixture_gate` passed, and `SK-1 local-check` passed in 15.27s with clean subprocess teardown.
+- **Pending Evidence**: Teammate PR reviews (both teammates required for FR-9), remote GitHub Actions Python 3.11/3.12 PR run, clean-clone timing, and C20–C22 skill/coverage/live-smoke closures.
 
 ### Session C07-S01: Scaffold the Python MCP Service
 - **Date**: 2026-11-25 (IST)

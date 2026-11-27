@@ -14,7 +14,9 @@ from focuslist.errors import (
     AuthRequiredError,
     ChannelUnavailableError,
     FocusListError,
+    InvalidArgumentsError,
     NetworkTimeoutError,
+    NoYouTubeChannelError,
     QuotaExhaustedError,
     RateLimitedError,
     UpstreamFailureError,
@@ -30,7 +32,12 @@ from focuslist.metadata import (
     parse_utc_datetime,
     select_video_language,
 )
+from focuslist.platform.auth import VALID_WRITE_SCOPES
 from focuslist.platform.provider import VideoProvider
+from focuslist.platform.write_contracts import (
+    AmbiguousWriteError,
+    WriteAuthorizationContext,
+)
 from focuslist.types import (
     AccountActivityRecord,
     ChannelRecord,
@@ -89,6 +96,7 @@ class LiveVideoProvider(VideoProvider):
         *,
         credentials: Any | None = None,
         credential_provider: Callable[[], Any] | None = None,
+        auth_manager: Any | None = None,
         http_transport: Any | None = None,
         service: Any | None = None,
         attempt_observer: Callable[[str, int], None] | None = None,
@@ -96,6 +104,7 @@ class LiveVideoProvider(VideoProvider):
         self.settings = settings or get_settings()
         self._credentials = credentials
         self._credential_provider = credential_provider
+        self._auth_manager = auth_manager
         self._http_transport = http_transport
         self._service = service
         self._attempt_observer = attempt_observer
@@ -103,6 +112,7 @@ class LiveVideoProvider(VideoProvider):
         self.call_counts: dict[str, int] = defaultdict(int)
         self.requests: int = 0
         self.network_attempts: int = 0
+        self.writes: int = 0
 
         # Confined imports: verified at initialization
         try:
@@ -127,12 +137,25 @@ class LiveVideoProvider(VideoProvider):
         )
         return google_auth_httplib2.AuthorizedHttp(credentials, http=base_http)
 
-    def _ensure_service(self) -> Any:
-        """Resolve injected credentials/service or raise AuthRequiredError."""
+    def _ensure_service(self, *, require_write: bool = False) -> Any:
+        """Resolve injected credentials/service, verify scopes, or raise AuthRequiredError."""
+        if require_write and self._auth_manager is not None:
+            self._auth_manager.ensure_valid_session(require_write=True)
+
         if self._service is not None:
+            if require_write and self._credentials is not None:
+                scopes = getattr(self._credentials, "scopes", None)
+                if scopes is not None and not any(s in VALID_WRITE_SCOPES for s in scopes):
+                    raise AuthRequiredError(
+                        "Playlist write operations require an approved YouTube write scope."
+                    )
             return self._service
 
-        if self._credentials is None and self._credential_provider is not None:
+        if self._credentials is None and self._auth_manager is not None:
+            self._credentials = self._auth_manager.build_google_credentials(
+                require_write=require_write
+            )
+        elif self._credentials is None and self._credential_provider is not None:
             self._credentials = self._credential_provider()
 
         if self._credentials is None:
@@ -140,6 +163,12 @@ class LiveVideoProvider(VideoProvider):
                 "Live YouTube operations require an authorized Google account. "
                 "Run 'focuslist auth login' to authenticate, or switch to fixture mode."
             )
+        if require_write:
+            scopes = getattr(self._credentials, "scopes", None)
+            if scopes is not None and not any(s in VALID_WRITE_SCOPES for s in scopes):
+                raise AuthRequiredError(
+                    "Playlist write operations require an approved YouTube write scope."
+                )
 
         import googleapiclient.discovery
 
@@ -184,8 +213,16 @@ class LiveVideoProvider(VideoProvider):
                     raise RateLimitedError(
                         "YouTube Data API rate limit exceeded (HTTP 403)."
                     ) from exc
+                if reason in {"youtubeSignupRequired", "channelNotFound"}:
+                    raise NoYouTubeChannelError(
+                        "The authenticated Google account does not have an active YouTube channel."
+                    ) from exc
                 raise AuthRequiredError(
                     "YouTube Data API access forbidden for current credentials (HTTP 403)."
+                ) from exc
+            if status in {400, 404} and reason in {"youtubeSignupRequired", "channelNotFound"}:
+                raise NoYouTubeChannelError(
+                    "The authenticated Google account does not have an active YouTube channel."
                 ) from exc
             if status == 404:
                 if is_channel:
@@ -612,24 +649,206 @@ class LiveVideoProvider(VideoProvider):
         )
         return bool(resp.get("items"))
 
+    def require_channel_eligibility(self, account_id: str) -> bool:
+        """Verify the authorized user owns an active YouTube channel or raise NO_YOUTUBE_CHANNEL."""
+        if not self.check_channel_eligibility(account_id):
+            raise NoYouTubeChannelError(
+                "The authenticated Google account does not have an active YouTube channel."
+            )
+        return True
+
+    def _execute_write_request(
+        self,
+        endpoint_name: str,
+        request_obj: Any,
+        *,
+        playlist_id: str | None = None,
+        video_id: str | None = None,
+        position: int | None = None,
+    ) -> Any:
+        """Execute a bounded write mutation, distinguishing known rejections from ambiguous timeouts."""
+        try:
+            return self._execute_request(endpoint_name, request_obj)
+        except (NetworkTimeoutError, UpstreamFailureError, UpstreamUnavailableError) as exc:
+            raise AmbiguousWriteError(
+                endpoint_name,
+                playlist_id=playlist_id,
+                video_id=video_id,
+                position=position,
+            ) from exc
+
+    def _require_write_context(
+        self,
+        write_context: WriteAuthorizationContext | None,
+        *,
+        allowed_actions: set[str],
+    ) -> WriteAuthorizationContext:
+        if write_context is None:
+            raise AuthRequiredError(
+                "Playlist write primitives require a verified WriteAuthorizationContext."
+            )
+        if write_context.action_kind not in allowed_actions:
+            raise InvalidArgumentsError(
+                f"Write context action '{write_context.action_kind}' is not valid for this operation."
+            )
+        return write_context
+
     def create_playlist(
         self,
         title: str,
         description: str,
         privacy: str = "private",
+        *,
+        write_context: WriteAuthorizationContext | None = None,
     ) -> str:
-        self._ensure_service()
-        raise NotImplementedError("Playlist write operations are deferred to C21/C27.")
+        ctx = self._require_write_context(write_context, allowed_actions={"create"})
+        approved_title = ctx.approved_title
+        approved_privacy = ctx.approved_privacy
+        if approved_privacy not in {"private", "unlisted", "public"}:
+            raise InvalidArgumentsError("Playlist visibility must be private, unlisted, or public.")
+
+        self.call_counts["create_playlist"] += 1
+        self.requests += 1
+        service = self._ensure_service(require_write=True)
+
+        body = {
+            "snippet": {
+                "title": approved_title,
+                "description": description,
+            },
+            "status": {
+                "privacyStatus": approved_privacy,
+            },
+        }
+        resp = self._execute_write_request(
+            "playlists.insert",
+            service.playlists().insert(part="snippet,status", body=body),
+        )
+        playlist_id = resp.get("id")
+        if not isinstance(playlist_id, str) or not playlist_id.strip():
+            raise UpstreamFailureError(
+                "YouTube playlists.insert returned no playlist identifier."
+            )
+        self.writes += 1
+        return playlist_id.strip()
 
     def insert_playlist_item(
         self,
         playlist_id: str,
         video_id: str,
         position: int | None = None,
+        *,
+        write_context: WriteAuthorizationContext | None = None,
     ) -> str:
-        self._ensure_service()
-        raise NotImplementedError("Playlist write operations are deferred to C21/C27.")
+        self._require_write_context(write_context, allowed_actions={"create", "resume"})
+        if not isinstance(playlist_id, str) or not playlist_id.strip():
+            raise InvalidArgumentsError("playlist_id is required for playlist item insertion.")
+        if not isinstance(video_id, str) or not video_id.strip():
+            raise InvalidArgumentsError("video_id is required for playlist item insertion.")
+        if position is not None and (isinstance(position, bool) or position < 0):
+            raise InvalidArgumentsError("position must be a non-negative integer.")
 
-    def delete_playlist(self, playlist_id: str) -> bool:
-        self._ensure_service()
-        raise NotImplementedError("Playlist undo operations are deferred to C30.")
+        self.call_counts["insert_playlist_item"] += 1
+        self.requests += 1
+        service = self._ensure_service(require_write=True)
+
+        snippet: dict[str, Any] = {
+            "playlistId": playlist_id.strip(),
+            "resourceId": {
+                "kind": "youtube#video",
+                "videoId": video_id.strip(),
+            },
+        }
+        if position is not None:
+            snippet["position"] = position
+
+        resp = self._execute_write_request(
+            "playlistItems.insert",
+            service.playlistItems().insert(part="snippet", body={"snippet": snippet}),
+            playlist_id=playlist_id,
+            video_id=video_id,
+            position=position,
+        )
+        item_id = resp.get("id")
+        if not isinstance(item_id, str) or not item_id.strip():
+            raise UpstreamFailureError(
+                "YouTube playlistItems.insert returned no playlistItem identifier."
+            )
+        self.writes += 1
+        return item_id.strip()
+
+    def delete_playlist(
+        self,
+        playlist_id: str,
+        *,
+        write_context: WriteAuthorizationContext | None = None,
+    ) -> bool:
+        ctx = self._require_write_context(write_context, allowed_actions={"undo"})
+        if ctx.target_playlist_id != playlist_id:
+            raise InvalidArgumentsError(
+                "Target playlist_id does not match the approved undo proposal."
+            )
+
+        self.call_counts["delete_playlist"] += 1
+        self.requests += 1
+        service = self._ensure_service(require_write=True)
+
+        from googleapiclient.errors import HttpError
+
+        self.network_attempts += 1
+        if self._attempt_observer is not None:
+            self._attempt_observer("playlists.delete", 1)
+
+        try:
+            service.playlists().delete(id=playlist_id).execute()
+        except TimeoutError as exc:
+            raise AmbiguousWriteError("playlists.delete", playlist_id=playlist_id) from exc
+        except HttpError as exc:
+            status, reason = _extract_http_error_info(exc)
+            if status == 401:
+                raise AuthExpiredError(
+                    "OAuth access token was rejected (HTTP 401). Re-authenticate."
+                ) from exc
+            if status == 403 and reason in {"quotaExceeded", "dailyLimitExceeded"}:
+                raise QuotaExhaustedError("YouTube Data API daily quota exhausted (HTTP 403).") from exc
+            if status == 403 and reason in {"rateLimitExceeded", "userRateLimitExceeded"}:
+                raise RateLimitedError("YouTube Data API rate limit exceeded (HTTP 403).") from exc
+            if status == 403:
+                raise AuthRequiredError(
+                    "Insufficient permission to delete playlist (HTTP 403)."
+                ) from exc
+            if status == 404:
+                raise VideoUnavailableError("Target playlist was not found (HTTP 404).") from exc
+            if status in {500, 503}:
+                raise AmbiguousWriteError("playlists.delete", playlist_id=playlist_id) from exc
+            raise UpstreamFailureError(
+                f"YouTube playlists.delete failed (HTTP {status or 'unknown'})."
+            ) from exc
+        self.writes += 1
+        return True
+
+    def list_playlist_items_for_reconciliation(
+        self,
+        playlist_id: str,
+        max_results: int = 50,
+    ) -> list[str]:
+        """Read-only reconciliation helper returning video IDs currently present in playlist_id."""
+        service = self._ensure_service()
+        cap = max(1, min(max_results, _MAX_BATCH_SIZE))
+        resp = self._execute_request(
+            "playlistItems.list",
+            service.playlistItems().list(
+                part="snippet,contentDetails",
+                playlistId=playlist_id,
+                maxResults=cap,
+            ),
+        )
+        ids: list[str] = []
+        for item in resp.get("items", []):
+            if isinstance(item, dict):
+                vid = (item.get("contentDetails") or {}).get("videoId") or (
+                    (item.get("snippet") or {}).get("resourceId") or {}
+                ).get("videoId")
+                if isinstance(vid, str) and vid:
+                    ids.append(vid)
+        return ids

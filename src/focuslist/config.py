@@ -105,10 +105,24 @@ class Settings(BaseSettings):
         description="Maximum retry attempts for transient 5xx or network errors",
     )
 
-    # OAuth Settings (SRS FR-9.2)
+    # OAuth & Security Storage Settings (SRS FR-9.2, FR-9.4)
     oauth_client_file: Path | None = Field(
         default=None,
         description="Path to client_secret.json (loaded externally, never committed)",
+    )
+    auth_store_dir: Path | None = Field(
+        default=None,
+        description="Optional override for user-only credential and signing-key directory",
+    )
+
+    # Gateway & CI Guards
+    cache_enabled: bool = Field(
+        default=True,
+        description="Enable SQLite response caching in ProviderGateway",
+    )
+    scheduled_live_mode: bool = Field(
+        default=False,
+        description="Enforce scheduled live CI caps (500 general units, 5 searches)",
     )
 
     # Diagnostics & Logging

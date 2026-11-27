@@ -14,6 +14,7 @@ from focuslist.platform.fixture_provider import FixtureVideoProvider
 def server_with_spy(
     monkeypatch: pytest.MonkeyPatch, fixture_provider: FixtureVideoProvider, test_settings: Settings
 ) -> Any:
+    test_settings.cache_enabled = False
     monkeypatch.setattr(server_module, "create_provider", lambda settings: fixture_provider)
     return server_module.create_server(settings=test_settings)
 
