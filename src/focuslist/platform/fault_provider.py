@@ -122,6 +122,10 @@ class FaultInjectionProvider(VideoProvider):
         self._before_call("search_video_ids")
         return self.target.search_video_ids(query, max_results=max_results)
 
+    def search_channel_ids(self, query: str, max_results: int = 50) -> list[str]:
+        self._before_call("search_channel_ids")
+        return self.target.search_channel_ids(query, max_results=max_results)
+
     def get_channel_upload_ids(self, channel_id: str, max_results: int = 50) -> list[str]:
         self._before_call("get_channel_upload_ids")
         return self.target.get_channel_upload_ids(channel_id, max_results=max_results)
@@ -133,6 +137,10 @@ class FaultInjectionProvider(VideoProvider):
     ) -> ChannelRecord | None:
         self._before_call("get_channel_details")
         return self.target.get_channel_details(channel_id=channel_id, handle=handle)
+
+    def get_channels_details(self, channel_ids: list[str]) -> list[ChannelRecord]:
+        self._before_call("get_channels_details")
+        return self.target.get_channels_details(channel_ids)
 
     def get_channel_recent_uploads(
         self,
@@ -165,6 +173,14 @@ class FaultInjectionProvider(VideoProvider):
     ) -> list[dict[str, Any]]:
         self._before_call("get_user_playlists")
         return self.target.get_user_playlists(account_id, max_results=max_results)
+
+    def get_playlist_items(
+        self,
+        playlist_id: str,
+        max_results: int = 100,
+    ) -> list[AccountActivityRecord]:
+        self._before_call("get_playlist_items")
+        return self.target.get_playlist_items(playlist_id, max_results=max_results)
 
     def get_categories(self, region_code: str = "US") -> list[dict[str, Any]]:
         self._before_call("get_categories")

@@ -20,11 +20,13 @@ class RequestContext:
         clock: Clock | None = None,
         account_id: str | None = None,
         request_id: str | None = None,
+        has_read_consent: bool | None = None,
     ) -> None:
         self.settings = settings or get_settings()
         self.clock = clock or SystemClock()
         self.account_id = account_id
         self.request_id = request_id or str(uuid.uuid4())
+        self.has_read_consent = has_read_consent
         self.quota_used = 0
         self.search_calls_used = 0
         self.cache_hits = 0

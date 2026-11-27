@@ -168,9 +168,9 @@ Keep `brain/` with an inbox, Projects, Areas, Resources, Archive, an index and a
 
 | Owner | Historical assignments | Remaining assignments | Responsibility |
 | --- | --- | --- | --- |
-| Aangir Doshi | C01, C04, C07, C10, C13 | C16, C22 (2) | Platform, quota, OAuth, CI and release |
-| Harshil Srivastav | C02, C05, C08, C11, C14 | C17, C19, C20 (3) | Discovery, analytics, scoring and read-side verification |
-| Ayush Patel | C03, C06, C09, C12, C15 | C18, C21 (2) | Curation, consent, recovery and product demo |
+| Aangir Doshi | C01, C04, C07, C10, C13 | C16, C20 (2) | Platform, quota, OAuth, CI and release |
+| Harshil Srivastav | C02, C05, C08, C11, C14 | C18, C19, C22 (3) | Discovery, analytics, scoring and read-side verification |
+| Ayush Patel | C03, C06, C09, C12, C15 | C17, C21 (2) | Curation, consent, recovery and product demo |
 
 C01–C15 retain their historical wording and IDs. Older documentation or source comments that refer to C16–C36 use the original numbering. Use the [mapping below](#legacy-assignment-mapping) to resolve those references.
 
@@ -651,13 +651,13 @@ I am Aangir Doshi, the owner of C16. Apply the Shared Antigravity instructions. 
 
 #### C17 Deliver channels recommendations and engagement
 
-**Owner** Harshil Srivastav · **Target** Fri 4 Dec 2026 (IST) · **Depends on** C05, C08, C10, C11, C14, C16
+**Owner** Ayush Patel · **Target** Fri 4 Dec 2026 (IST) · **Depends on** C05, C08, C10, C11, C14, C16
 
 **Workstreams** legacy C17, legacy C20, legacy C23 · **Implementation plan sections** 2, 3, 4, 6, 7
 
 **Commit message** `feat(discovery): deliver channel recommendations and engagement tools`
 
-- [ ] Pending · Actual date (IST) — · Evidence — <!-- C17-status -->
+- [x] Done · Actual date (IST) 2026-11-28 · Evidence — ruff check src tests: All checks passed; pytest -q: 235 passed, 0 failed in 35.66s (commands run 2026-11-28); tools verified: similar_channels (FR-2, two-pass reranking), recommend_videos (FR-3, consent gate, NO_PROFILE_DATA), analyse_engagement (FR-4, UTC periods, comparison deltas, histogram, timestamp provenance); tests: ST-FR2, ST-FR3, ST-FR4, NEG-INPUT, NEG-PROFILE, NEG-METADATA; fixture MCP stdio system test passed; ADR-002 updated (FR-3 weights reconciled to SRS 0.60/0.15/0.15/0.10); mcp-reference.md regenerated; branch c17/channels-recommendations-engagement <!-- C17-status -->
 
 Ship FR-2, FR-3 and FR-4 over the shared authorised read and quota contracts.
 
@@ -701,12 +701,12 @@ Use the SRS FR-3 weights if the C08 ADR disagrees. Correct the discovery ADR and
 **Prompt**
 
 ~~~text
-I am Harshil Srivastav, the owner of C17. Apply the Shared Antigravity instructions. Read implementation plan sections 2, 3, 4, 6, 7 and the entire C17 entry. Build the three read tools with the stated source caps, explainable ranking, UTC periods and disclosed timestamp provenance. Test negative input, no consent, empty profiles, quota bounds and account-data purge. Reconcile FR-3 defaults to the SRS and exercise each tool through fixture MCP. Work through every listed legacy workstream and its completion gate as one assignment. Update only the C17 completion line using actual verification results.
+I am Ayush Patel, the owner of C17. Apply the Shared Antigravity instructions. Read implementation plan sections 2, 3, 4, 6, 7 and the entire C17 entry. Build the three read tools with the stated source caps, explainable ranking, UTC periods and disclosed timestamp provenance. Test negative input, no consent, empty profiles, quota bounds and account-data purge. Reconcile FR-3 defaults to the SRS and exercise each tool through fixture MCP. Work through every listed legacy workstream and its completion gate as one assignment. Update only the C17 completion line using actual verification results.
 ~~~
 
 #### C18 Finish ordered playlists and confirmed writes
 
-**Owner** Ayush Patel · **Target** Mon 7 Dec 2026 (IST) · **Depends on** C09, C10, C12, C14–C17
+**Owner** Harshil Srivastav · **Target** Mon 7 Dec 2026 (IST) · **Depends on** C09, C10, C12, C14–C17
 
 **Workstreams** legacy C18, legacy C21, legacy C24, legacy C27, legacy C30 · **Implementation plan sections** 2, 3, 4, 5, 6, 7
 
@@ -778,7 +778,7 @@ Use fake time and a provider spy for positive and negative MCP cases. Treat conf
 **Prompt**
 
 ~~~text
-I am Ayush Patel, the owner of C18. Apply the Shared Antigravity instructions. Read implementation plan sections 2, 3, 4, 5, 6, 7 and the entire C18 entry. Implement ordering, signed storage and claim, the human approval boundary, confirmed creation and recovery in that order. Include the exact approved action, at least 15 synthetic metadata attacks and zero-call/zero-write failure cases. Exercise replay and restart with fake time and mock writes. Work through every listed legacy workstream and its completion gate as one assignment. Update only the C18 completion line using actual verification results.
+I am Harshil Srivastav, the owner of C18. Apply the Shared Antigravity instructions. Read implementation plan sections 2, 3, 4, 5, 6, 7 and the entire C18 entry. Implement ordering, signed storage and claim, the human approval boundary, confirmed creation and recovery in that order. Include the exact approved action, at least 15 synthetic metadata attacks and zero-call/zero-write failure cases. Exercise replay and restart with fake time and mock writes. Work through every listed legacy workstream and its completion gate as one assignment. Update only the C18 completion line using actual verification results.
 ~~~
 
 #### C19 Publish scoring evidence and playlist audit
@@ -825,7 +825,7 @@ I am Harshil Srivastav, the owner of C19. Apply the Shared Antigravity instructi
 
 #### C20 Deliver brain-ingest and verify read features
 
-**Owner** Harshil Srivastav · **Target** Wed 9 Dec 2026 (IST) · **Depends on** C14, C16 fixture CI, C17, C19
+**Owner** Aangir Doshi · **Target** Wed 9 Dec 2026 (IST) · **Depends on** C14, C16 fixture CI, C17, C19
 
 **Workstreams** legacy C32, legacy C34 · **Implementation plan sections** 2, 4, 6, 7
 
@@ -862,7 +862,7 @@ Deliver SK-3, complete the read-side fixture evidence and prepare the read-side 
 **Prompt**
 
 ~~~text
-I am Harshil Srivastav, the owner of C20. Apply the Shared Antigravity instructions. Read implementation plan sections 2, 4, 6, 7 and the entire C20 entry. Implement and evaluate brain-ingest with a synthetic vault. Rerun scripted read MCP cases, publish runnable read demo commands and measured evidence, and rehearse with the selected client and scripted client or MCP Inspector. Leave skills awaiting C21 explicitly pending. Work through every listed legacy workstream and its completion gate as one assignment. Update only the C20 completion line using actual verification results.
+I am Aangir Doshi, the owner of C20. Apply the Shared Antigravity instructions. Read implementation plan sections 2, 4, 6, 7 and the entire C20 entry. Implement and evaluate brain-ingest with a synthetic vault. Rerun scripted read MCP cases, publish runnable read demo commands and measured evidence, and rehearse with the selected client and scripted client or MCP Inspector. Leave skills awaiting C21 explicitly pending. Work through every listed legacy workstream and its completion gate as one assignment. Update only the C20 completion line using actual verification results.
 ~~~
 
 #### C21 Finish product skills and the curation demo
@@ -910,7 +910,7 @@ I am Ayush Patel, the owner of C21. Apply the Shared Antigravity instructions. R
 
 #### C22 Close CI verification and prepare the release
 
-**Owner** Aangir Doshi · **Target** Fri 11 Dec 2026 (IST) · **Depends on** C16–C21
+**Owner** Harshil Srivastav · **Target** Fri 11 Dec 2026 (IST) · **Depends on** C16–C21
 
 **Workstreams** legacy C31, legacy C36 · **Implementation plan sections** 1, 2, 3, 6, 7
 
@@ -950,7 +950,7 @@ Continue from the opening fixture gate in C16. After the six-skill integration i
 **Prompt**
 
 ~~~text
-I am Aangir Doshi, the owner of C22. Apply the Shared Antigravity instructions. Read implementation plan sections 1, 2, 3, 6, 7 and the entire C22 entry. Finish the final offline CI and isolated scheduled smoke workstream, rerun the full fixture suite and six-skill inventory, and collect benchmark, coverage and release evidence. Check doc/schema parity and keep authorisation-dependent checks and the tag status explicit. Work through every listed legacy workstream and its completion gate as one assignment. Update only the C22 completion line using actual verification results.
+I am Harshil Srivastav, the owner of C22. Apply the Shared Antigravity instructions. Read implementation plan sections 1, 2, 3, 6, 7 and the entire C22 entry. Finish the final offline CI and isolated scheduled smoke workstream, rerun the full fixture suite and six-skill inventory, and collect benchmark, coverage and release evidence. Check doc/schema parity and keep authorisation-dependent checks and the tag status explicit. Work through every listed legacy workstream and its completion gate as one assignment. Update only the C22 completion line using actual verification results.
 ~~~
 
 ## Source files

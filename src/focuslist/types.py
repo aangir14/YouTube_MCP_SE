@@ -107,6 +107,10 @@ class AccountActivityRecord(BaseModel):
     timestamp: datetime | None = Field(default=None, description="Event occurrence timestamp")
     timestamp_provenance: Literal["genuine", "publication_fallback", "unknown"] = "unknown"
     channel_id: str | None = Field(default=None, description="Channel ID associated with event")
+    playlist_id: str | None = Field(default=None, description="Owning playlist ID when applicable")
+    playlist_item_id: str | None = Field(
+        default=None, description="Playlist item ID for deduplicating playlist memberships"
+    )
 
 
 class RankedItemRecord(BaseModel):

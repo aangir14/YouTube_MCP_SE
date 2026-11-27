@@ -6,7 +6,7 @@ Auto-generated from `focuslist.server.create_server()` FastMCP tool, resource, a
 
 | Tool | Description | Required Inputs |
 | :--- | :--- | :--- |
-| `analyse_engagement` | Analyze viewing and engagement patterns across categories, channels, and durations. | `*(none)*` |
+| `analyse_engagement` | Analyze viewing and engagement patterns across categories, channels, and durations. | `sources` |
 | `analyse_playlist` | Summarize a public or user playlist's duration distribution and topics. | `playlist_url_or_id` |
 | `audit_playlist` | Audit a playlist for unavailable, duplicate, overlong, or stale videos. | `playlist_url_or_id` |
 | `auth_status` | Inspect current Google OAuth authorization status, scopes, and token age. | `*(none)*` |
@@ -15,7 +15,7 @@ Auto-generated from `focuslist.server.create_server()` FastMCP tool, resource, a
 | `get_quota_status` | Inspect the local quota ledger: general units and search calls remaining today. | `*(none)*` |
 | `get_video_details` | Fetch verified metadata fact sheet and public statistics for a YouTube video. | `video_url_or_id` |
 | `propose_playlist` | Formulate an immutable, constraint-bounded playlist proposal for user review. | `topic, target_duration, max_item_duration` |
-| `recommend_videos` | Recommend videos tailored to the learner's authorized likes and subscriptions. | `*(none)*` |
+| `recommend_videos` | Recommend videos tailored to the learner's authorized likes, subscriptions, and playlists. | `sources` |
 | `similar_channels` | Discover channels covering similar topics to a seed channel handle or ID. | `channel_url_handle_or_id` |
 | `similar_videos` | Discover and rank YouTube videos similar to a seed video using metadata similarity. | `video_url_or_id` |
 | `undo_playlist` | Propose deletion of a FocusList-created playlist within the 30-day retention window. | `playlist_id` |
@@ -41,27 +41,60 @@ Auto-generated from `focuslist.server.create_server()` FastMCP tool, resource, a
 ```json
 {
   "properties": {
-    "period_days": {
-      "default": 30,
-      "title": "Period Days",
-      "type": "integer"
-    },
-    "sources": {
+    "comparison_period": {
       "anyOf": [
         {
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
+          "additionalProperties": true,
+          "type": "object"
         },
         {
           "type": "null"
         }
       ],
       "default": null,
-      "title": "Sources"
+      "title": "Comparison Period"
+    },
+    "group_by": {
+      "default": "week",
+      "title": "Group By",
+      "type": "string"
+    },
+    "period": {
+      "anyOf": [
+        {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Period"
+    },
+    "period_days": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Period Days"
+    },
+    "sources": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Sources",
+      "type": "array"
     }
   },
+  "required": [
+    "sources"
+  ],
   "title": "analyse_engagementArguments",
   "type": "object"
 }
@@ -322,19 +355,11 @@ Auto-generated from `focuslist.server.create_server()` FastMCP tool, resource, a
       "type": "integer"
     },
     "sources": {
-      "anyOf": [
-        {
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "default": null,
-      "title": "Sources"
+      "items": {
+        "type": "string"
+      },
+      "title": "Sources",
+      "type": "array"
     },
     "topic": {
       "anyOf": [
@@ -349,6 +374,9 @@ Auto-generated from `focuslist.server.create_server()` FastMCP tool, resource, a
       "title": "Topic"
     }
   },
+  "required": [
+    "sources"
+  ],
   "title": "recommend_videosArguments",
   "type": "object"
 }

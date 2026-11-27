@@ -13,16 +13,17 @@ from focuslist.clock import SystemClock
 from focuslist.config import Settings, get_settings
 from focuslist.context import RequestContext
 from focuslist.curation import propose_playlist_action
+from focuslist.discovery.channels import ChannelDiscovery
+from focuslist.discovery.engagement import EngagementService
+from focuslist.discovery.recommendations import RecommendationService
 from focuslist.discovery.videos import VideoDiscovery
 from focuslist.errors import (
-    ChannelUnavailableError,
     ConfirmationExpiredError,
     ConfirmationInvalidError,
     FocusListError,
     InvalidArgumentsError,
 )
 from focuslist.metadata import (
-    parse_channel_reference,
     parse_playlist_id,
 )
 from focuslist.platform import create_provider
@@ -68,6 +69,11 @@ def create_server(
         )
     )
     video_discovery = VideoDiscovery(provider, ctx)
+    channel_discovery = ChannelDiscovery(provider, ctx)
+    recommendation_service = RecommendationService(
+        provider, ctx, storage=storage, auth_manager=auth_manager
+    )
+    engagement_service = EngagementService(provider, ctx, auth_manager=auth_manager)
 
     mcp = FastMCP(
         name="focuslist",
@@ -101,33 +107,11 @@ def create_server(
         name="similar_channels",
         description="Discover channels covering similar topics to a seed channel handle or ID.",
     )
-    def similar_channels(channel_url_handle_or_id: str, limit: int = 10) -> dict[str, Any]:
-        """Discover similar channels with topic relevance scores."""
-        try:
-            seed = parse_channel_reference(channel_url_handle_or_id)
-        except FocusListError as exc:
-            return ctx.failure(exc).model_dump()
-
-        if limit < 1 or limit > 25:
-            return ctx.failure(
-                InvalidArgumentsError("Limit must be between 1 and 25.")
-            ).model_dump()
-
-        ctx.record_quota_charge(25)
-        chan = provider.get_channel_details(**seed.provider_arguments())
-        if chan is None:
-            return ctx.failure(ChannelUnavailableError()).model_dump()
-        results = [
-            {
-                "channel_id": chan.channel_id,
-                "title": chan.title,
-                "handle": chan.handle,
-                "score": 0.88,
-                "rank": 1,
-                "reason": "Shared Computer Science topic categories and high upload overlap.",
-            }
-        ]
-        return ctx.success({"seed": chan.channel_id, "channels": results}).model_dump()
+    def similar_channels(channel_url_handle_or_id: str, limit: StrictInt = 10) -> dict[str, Any]:
+        """Discover similar channels with two-pass upload reranking (costs <=25 general, <=3 search)."""
+        return channel_discovery.tool_response(
+            lambda: channel_discovery.similar(channel_url_handle_or_id, limit)
+        )
 
     # ==========================================================================
     # Personalization & Analytics Tools (SRS FR-3, FR-4)
@@ -135,56 +119,37 @@ def create_server(
 
     @mcp.tool(
         name="recommend_videos",
-        description="Recommend videos tailored to the learner's authorized likes and subscriptions.",
+        description="Recommend videos tailored to the learner's authorized likes, subscriptions, and playlists.",
     )
     def recommend_videos(
-        sources: list[str] | None = None, topic: str | None = None, limit: int = 10
+        sources: list[str], topic: str | None = None, limit: StrictInt = 10
     ) -> dict[str, Any]:
-        """Generate personalized recommendations (costs <=40 general units)."""
-        ctx.record_quota_charge(40)
-        cands = provider.search_candidates(topic or "algorithms", max_results=limit)
-        results = [
-            {
-                "video_id": v.video_id,
-                "title": v.title,
-                "channel_title": v.channel_title,
-                "duration": v.duration_display,
-                "score": 0.85,
-                "rank": idx + 1,
-                "reason": "Aligned with recent subscription uploads and topic match.",
-            }
-            for idx, v in enumerate(cands[:limit])
-        ]
-        return ctx.success(
-            {"topic": topic, "count": len(results), "recommendations": results}
-        ).model_dump()
+        """Generate personalized recommendations (costs <=40 general units, <=3 searches)."""
+        return recommendation_service.tool_response(
+            lambda: recommendation_service.recommend(sources, topic=topic, limit=limit)
+        )
 
     @mcp.tool(
         name="analyse_engagement",
         description="Analyze viewing and engagement patterns across categories, channels, and durations.",
     )
     def analyse_engagement(
-        sources: list[str] | None = None, period_days: int = 30
+        sources: list[str],
+        period: dict[str, Any] | None = None,
+        period_days: StrictInt | None = None,
+        comparison_period: dict[str, Any] | None = None,
+        group_by: str = "week",
     ) -> dict[str, Any]:
         """Analyze account engagement statistics (costs <=60 units, 0 searches)."""
-        ctx.record_quota_charge(60)
-        return ctx.success(
-            {
-                "period_days": period_days,
-                "total_items": 12,
-                "mean_duration": "14:30",
-                "median_duration": "15:00",
-                "top_categories": [{"category": "Science & Technology", "count": 8, "share": 0.67}],
-                "top_channels": [{"channel": "Synthetic Tech Academy", "count": 5, "share": 0.42}],
-                "duration_histogram": {
-                    "sub_5m": 0,
-                    "5_to_10m": 3,
-                    "10_to_20m": 7,
-                    "20_to_40m": 2,
-                    "over_40m": 0,
-                },
-            }
-        ).model_dump()
+        return engagement_service.tool_response(
+            lambda: engagement_service.analyse(
+                sources,
+                period=period,
+                period_days=period_days,
+                comparison_period=comparison_period,
+                group_by=group_by,
+            )
+        )
 
     # ==========================================================================
     # Playlist Curation & Confirmation Gate Tools (SRS FR-5, FR-7)

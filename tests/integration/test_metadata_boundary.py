@@ -129,7 +129,9 @@ async def test_channel_reference_uses_correct_provider_key(
         {"channel_url_handle_or_id": "https://www.youtube.com/@synthetic_tech"},
     )
     assert direct["result"] == handle["result"]
-    assert [row["args"] for row in fixture_provider.call_log] == [
+    assert [
+        row["args"] for row in fixture_provider.call_log if row["method"] == "get_channel_details"
+    ] == [
         {"channel_id": channel_id, "handle": None},
         {"channel_id": None, "handle": "@synthetic_tech"},
     ]
