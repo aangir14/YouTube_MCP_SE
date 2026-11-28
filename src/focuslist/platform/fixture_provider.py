@@ -7,11 +7,16 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
+from focuslist.errors import ErrorCode, FocusListError, InvalidArgumentsError
 from focuslist.metadata import normalise_channel_record, normalise_video_record
 from focuslist.platform.provider import VideoProvider
+from focuslist.platform.write_contracts import WriteAuthorizationContext
 from focuslist.types import (
     AccountActivityRecord,
     ChannelRecord,
+    PlaylistEntry,
+    PlaylistInfo,
+    PlaylistPage,
     VideoRecord,
 )
 
@@ -38,6 +43,7 @@ class FixtureVideoProvider(VideoProvider):
         self._subscriptions: list[AccountActivityRecord] | None = None
         self._playlists: list[dict[str, Any]] | None = None
         self._playlist_items: dict[str, list[AccountActivityRecord]] = {}
+        self._audit_entries: dict[str, tuple[PlaylistEntry, ...]] = {}
         self._load_fixtures()
 
     def reset_counters(self) -> None:
@@ -73,6 +79,14 @@ class FixtureVideoProvider(VideoProvider):
 
     def _load_fixtures(self) -> None:
         """Load synthetic fixtures from JSON files if present."""
+        audit_file = self.fixture_dir / "sample_playlist_audit.json"
+        if audit_file.is_file():
+            snapshots = json.loads(audit_file.read_text(encoding="utf-8"))
+            self._audit_entries = {
+                pid: tuple(PlaylistEntry.model_validate(row) for row in entries)
+                for pid, entries in snapshots.items()
+            }
+
         videos_file = self.fixture_dir / "sample_videos.json"
         if videos_file.exists():
             with open(videos_file, "r", encoding="utf-8") as f:
@@ -314,6 +328,33 @@ class FixtureVideoProvider(VideoProvider):
             {"id": "28", "title": "Science & Technology"},
         ]
 
+    def _read_playlist(self, playlist_id: str) -> tuple[PlaylistEntry, ...]:
+        if playlist_id in self._audit_entries:
+            return self._audit_entries[playlist_id]
+        if playlist_id in self._created_playlists:
+            return tuple(
+                PlaylistEntry(video_id=vid) for vid in self._created_playlists[playlist_id]["items"]
+            )
+        if playlist_id in self._playlist_items:
+            return tuple(PlaylistEntry(video_id=row.item_id) for row in self._playlist_items[playlist_id])
+        if any(row["playlist_id"] == playlist_id and not row.get("item_count")
+               for row in self._playlists or ()):
+            return ()
+        raise FocusListError(ErrorCode.PLAYLIST_UNAVAILABLE)
+
+    def get_playlist_info(self, playlist_id: str) -> PlaylistInfo:
+        self._record_call("get_playlist_info", playlist_id=playlist_id)
+        return PlaylistInfo(len(self._read_playlist(playlist_id)))
+
+    def get_playlist_page(
+        self, playlist_id: str, page_token: str | None = None, *, page_size: int = 50,
+    ) -> PlaylistPage:
+        self._record_call("get_playlist_page", playlist_id=playlist_id, page_size=page_size)
+        entries = self._read_playlist(playlist_id)
+        start = int(page_token) if page_token else 0
+        end = min(start + min(page_size, 50), len(entries))
+        return PlaylistPage(entries[start:end], str(end) if end < len(entries) else None)
+
     def check_channel_eligibility(self, account_id: str) -> bool:
         self._record_call("check_channel_eligibility", account_id=account_id)
         return True
@@ -323,11 +364,16 @@ class FixtureVideoProvider(VideoProvider):
         title: str,
         description: str,
         privacy: str = "private",
+        *,
+        write_context: WriteAuthorizationContext | None = None,
     ) -> str:
         self._record_call(
             "create_playlist", is_write=True, title=title, privacy=privacy
         )
-        pid = f"PL_syn_{len(self._created_playlists) + 1:04d}"
+        pid = (
+            f"PL_syn_{write_context.proposal_id[5:]}"
+            if write_context else f"PL_syn_{len(self._created_playlists) + 1:04d}"
+        )
         self._created_playlists[pid] = {
             "title": title,
             "description": description,
@@ -341,6 +387,8 @@ class FixtureVideoProvider(VideoProvider):
         playlist_id: str,
         video_id: str,
         position: int | None = None,
+        *,
+        write_context: WriteAuthorizationContext | None = None,
     ) -> str:
         self._record_call(
             "insert_playlist_item",
@@ -364,9 +412,27 @@ class FixtureVideoProvider(VideoProvider):
             items.append(video_id)
         return item_id
 
-    def delete_playlist(self, playlist_id: str) -> bool:
+    def delete_playlist(
+        self, playlist_id: str, *, write_context: WriteAuthorizationContext | None = None,
+    ) -> bool:
         self._record_call("delete_playlist", is_write=True, playlist_id=playlist_id)
         if playlist_id in self._created_playlists:
             del self._created_playlists[playlist_id]
             return True
         return False
+
+    def list_playlist_items_for_reconciliation(
+        self, playlist_id: str, max_results: int = 50,
+    ) -> list[str]:
+        if playlist_id not in self._created_playlists:
+            self._record_call("list_playlist_items_for_reconciliation", playlist_id=playlist_id)
+            raise InvalidArgumentsError("Could not verify a locally created fixture playlist.")
+        return [row.item_id for row in self.get_playlist_items(playlist_id, max_results)]
+
+    def find_created_playlist(self, title: str, description: str, privacy: str) -> str | None:
+        self._record_call("find_created_playlist")
+        matches = [
+            pid for pid, row in self._created_playlists.items()
+            if (row["title"], row["description"], row["privacy"]) == (title, description, privacy)
+        ]
+        return matches[0] if len(matches) == 1 else None

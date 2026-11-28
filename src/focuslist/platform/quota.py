@@ -33,12 +33,17 @@ METHOD_COSTS: dict[str, tuple[int, int]] = {
     "get_channel_details": (1, 0),
     "get_channels_details": (1, 0),
     "check_channel_eligibility": (1, 0),
+    "owned_channel_ids": (1, 0),
     "playlistItems.list": (1, 0),
     "get_channel_upload_ids": (1, 0),
     "get_channel_recent_uploads": (1, 0),
     "get_playlist_items": (1, 0),
+    "get_playlist_info": (1, 0),
+    "get_playlist_page": (1, 0),
+    "list_playlist_items_for_reconciliation": (1, 0),
     "playlists.list": (1, 0),
     "get_user_playlists": (1, 0),
+    "find_created_playlist": (1, 0),
     "subscriptions.list": (1, 0),
     "get_user_subscriptions": (1, 0),
     "get_user_likes": (1, 0),
@@ -52,6 +57,17 @@ METHOD_COSTS: dict[str, tuple[int, int]] = {
     "delete_playlist": (50, 0),
 }
 
+PLAYLIST_SCAN_LIMIT = 500
+PLAYLIST_PAGE_SIZE = 50
+
+
+def playlist_read_budget(item_limit: object) -> int:
+    """One metadata lookup plus at most one item page and detail batch per 50 positions."""
+    if type(item_limit) is not int or not 1 <= item_limit <= PLAYLIST_SCAN_LIMIT:
+        raise InvalidArgumentsError("Playlist item limit must be an integer in 1..500.")
+    return 2 * math.ceil(item_limit / PLAYLIST_PAGE_SIZE) + 1
+
+
 # Baseline operation ceilings from SRS Section 4.10, NFR-QUOTA-01, and Plan Section 3
 OPERATION_BASELINES: dict[str, tuple[int, int]] = {
     "get_video_details": (1, 0),
@@ -61,9 +77,10 @@ OPERATION_BASELINES: dict[str, tuple[int, int]] = {
     "analyse_engagement": (60, 0),
     "propose_playlist": (15, 3),
     "confirm_playlist": (651, 0),  # 51 + 50 * N (default N=12 per Appendix B.3)
+    "resume_playlist": (2, 0),  # bounded creation marker lookup and reconciliation snapshot
     "undo_playlist": (50, 0),
-    "analyse_playlist": (3, 0),  # 2 * ceil(n/50) + 1 (default n=50)
-    "audit_playlist": (3, 0),  # 2 * ceil(n/50) + 1 (default n=50)
+    "analyse_playlist": (playlist_read_budget(PLAYLIST_SCAN_LIMIT), 0),
+    "audit_playlist": (playlist_read_budget(PLAYLIST_SCAN_LIMIT), 0),
     "estimate_quota": (0, 0),
     "get_quota_status": (0, 0),
     "auth_status": (0, 0),
@@ -537,24 +554,30 @@ def estimate_operation_cost(
     cache_hits = 0
 
     if target_tool == "confirm_playlist":
+        prop = None
         item_count = args.get("item_count")
-        if item_count is None and storage is not None and isinstance(args.get("proposal_id"), str):
+        if storage is not None and isinstance(args.get("proposal_id"), str):
             prop = storage.get_proposal(args["proposal_id"])
             if prop is not None:
                 item_count = len(prop.ordered_video_ids)
         if item_count is None:
             item_count = 12
-        if isinstance(item_count, bool) or not isinstance(item_count, int) or not 1 <= item_count <= 50:
+        if prop is not None and prop.action_kind == "undo":
+            units = 50
+        elif prop is not None and prop.state == "completed":
+            units = 0
+        elif isinstance(item_count, bool) or not isinstance(item_count, int) or not 1 <= item_count <= 50:
             raise InvalidArgumentsError("confirm_playlist item_count must be an integer in 1..50.")
-        units = 51 + (50 * item_count)
+        elif prop is not None and prop.action_kind == "resume":
+            units = 1 + (50 * item_count)
+        else:
+            units = 51 + (50 * item_count)
+            if prop is not None:
+                review = prop.canonical_payload.get("action", {}).get("review", {})
+                units += int(review.get("estimated_scope_upgrade_cost") == 1)
         searches = 0
     elif target_tool in {"analyse_playlist", "audit_playlist"}:
-        item_count = args.get("item_count", 50)
-        if isinstance(item_count, bool) or not isinstance(item_count, int) or not 1 <= item_count <= 500:
-            raise InvalidArgumentsError(
-                f"{target_tool} item_count must be an integer in 1..500."
-            )
-        units = (2 * math.ceil(item_count / 50)) + 1
+        units = playlist_read_budget(args.get("item_limit", args.get("item_count", PLAYLIST_SCAN_LIMIT)))
         searches = 0
     else:
         units, searches = OPERATION_BASELINES[target_tool]
@@ -573,8 +596,10 @@ def estimate_operation_cost(
                     cache_hits = 1
 
     # Worst-case retry bound for read operations (writes never blindly retry)
-    is_write_op = target_tool in {"confirm_playlist", "undo_playlist"}
-    retry_factor = 1 if is_write_op else (1 + cfg.max_retries)
+    no_retry = target_tool in {
+        "confirm_playlist", "resume_playlist", "undo_playlist", "analyse_playlist", "audit_playlist",
+    }
+    retry_factor = 1 if no_retry else (1 + cfg.max_retries)
     max_units_with_retries = units * retry_factor
     max_searches_with_retries = searches * retry_factor
 

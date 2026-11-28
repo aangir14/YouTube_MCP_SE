@@ -21,10 +21,10 @@ _REF_NOW = datetime(2026, 11, 25, 12, 0, tzinfo=UTC)
 def _make_video(
     vid: str,
     *,
-    title: str = "Recursion Tutorial",
+    title: str | None = None,
     duration: int = 600,
     language: str | None = "en",
-    channel_id: str = "UC_chan_000000000000001",
+    channel_id: str | None = None,
     tags: list[str] | None = None,
     has_captions: bool | None = True,
     is_live: bool = False,
@@ -34,8 +34,8 @@ def _make_video(
     return VideoRecord(
         video_id=vid,
         canonical_url=f"https://www.youtube.com/watch?v={vid}",
-        title=title,
-        channel_id=channel_id,
+        title=title or f"Recursion {vid.replace('_', '')}",
+        channel_id=channel_id or f"UC_{vid}",
         channel_title="CS Academy",
         description="A clear, structured explanation of recursion and base cases in Python.",
         published_at=datetime(2026, 6, 1, tzinfo=UTC),
@@ -279,14 +279,14 @@ def test_solver_beats_greedy_baseline_on_shortlist() -> None:
 
 
 # ==============================================================================
-# 3. Deterministic Property Tests (250 Generated Cases)
+# 3. Deterministic Property Tests (1,000 Generated Cases)
 # ==============================================================================
 
 
-def test_solver_property_invariants_across_250_cases() -> None:
-    """Verify hard-filter, bound, uniqueness, and determinism invariants across 250 cases."""
+def test_solver_property_invariants_across_1000_cases() -> None:
+    """Verify constraints, diversity and deterministic order with seeded generated cases."""
     rng = random.Random(20261125)
-    for case_idx in range(250):
+    for case_idx in range(1000):
         target_min = rng.randint(15, 90)
         max_item_min = rng.randint(5, 20)
         min_item_min = rng.randint(2, min(5, max_item_min))
@@ -298,6 +298,8 @@ def test_solver_property_invariants_across_250_cases() -> None:
                 "max_item_duration": f"PT{max_item_min}M",
                 "min_item_duration": f"PT{min_item_min}M",
                 "max_items": max_items,
+                "ordering": rng.choice(["learning_path", "relevance", "chronological"]),
+                "session_minutes": rng.randint(5, 30),
             }
         )
 
@@ -308,10 +310,13 @@ def test_solver_property_invariants_across_250_cases() -> None:
             vid = f"p_{case_idx:03d}_{j:04d}"
             dur = rng.randint(60, 1500)
             lang = rng.choice(["en", "en", "en", "es", None])
-            pool.append(_make_video(vid, duration=dur, language=lang))
+            pool.append(_make_video(
+                vid, duration=dur, language=lang, channel_id=f"UC_group_{j % 5}",
+            ))
             scores[vid] = round(rng.uniform(0.1, 1.0), 4)
 
         res = solve_playlist(pool, constraints, pre_scored=scores)
+        assert res == solve_playlist(list(reversed(pool)), constraints, pre_scored=scores)
         if res.feasible:
             assert (
                 constraints.target_lower_seconds
@@ -320,6 +325,13 @@ def test_solver_property_invariants_across_250_cases() -> None:
             )
             assert 1 <= res.item_count <= constraints.max_items <= 50
             ids = [item.video_id for item in res.selected_items]
+            assert ids == [vid for session in res.sessions for vid in session.video_ids]
+            assert sum(session.total_duration_seconds for session in res.sessions) == res.total_duration_seconds
+            assert all(
+                sum(item.channel_id == channel for item in res.selected_items) <= 3
+                for channel in {item.channel_id for item in res.selected_items}
+            )
+            assert all(next(v for v in pool if v.video_id == vid).language == "en" for vid in ids)
             assert len(ids) == len(set(ids))
             assert sum(item.duration_seconds for item in res.selected_items) == (
                 res.total_duration_seconds
@@ -334,3 +346,55 @@ def test_solver_property_invariants_across_250_cases() -> None:
             assert res.selected_items == []
             assert res.unmet_constraints
             assert res.nearest_achievable_seconds < constraints.target_lower_seconds
+
+
+def test_fr8_series_modes_deduplication_channel_cap_and_sessions() -> None:
+    base = {
+        "topic": "recursion", "target_duration": "PT27M", "max_item_duration": "PT15M",
+        "tolerance": 0, "session_minutes": 8,
+    }
+    definitions = [
+        ("intro", "Introduction to Stack Thinking", "UC_intro", 300, 0.2, 4),
+        ("ep3", "Recursion Trees Lesson 3", "UC_series", 600, 0.98, 3),
+        ("ep1", "Recursion Trees Lesson 1", "UC_series", 360, 0.6, 2),
+        ("ep2", "Recursion Trees Lesson 2", "UC_series", 360, 0.55, 1),
+        ("duplicate", "Recursion Trees Lesson 2", "UC_copy", 360, 0.1, 5),
+        ("extra", "Expert Debugging Call Frames", "UC_series", 60, 0.05, 5),
+    ]
+    scores = {vid: score for vid, _, _, _, score, _ in definitions}
+    videos = [
+        _make_video(vid, title=title, channel_id=channel, duration=duration).model_copy(
+            update={"published_at": datetime(2026, 6, day, tzinfo=UTC)},
+        )
+        for vid, title, channel, duration, _, day in definitions
+    ]
+    modes = {
+        "learning_path": ["intro", "ep1", "ep2", "ep3"],
+        "relevance": ["ep3", "ep1", "ep2", "intro"],
+        "chronological": ["ep2", "ep1", "ep3", "intro"],
+    }
+    for mode, expected in modes.items():
+        constraints = validate_proposal_arguments(
+            {**base, "min_item_duration": "PT1M", "ordering": mode},
+        )
+        result = solve_playlist(videos, constraints, pre_scored=scores)
+        assert result.feasible and result.total_duration_seconds == 1620
+        assert [item.video_id for item in result.selected_items] == expected
+        assert [v for session in result.sessions for v in session.video_ids] == expected
+        assert [s.video_ids for s in result.sessions if s.oversized] == [["ep3"]]
+        assert result.filtered_out_counts["near_duplicate_title"] == 1
+        assert result.filtered_out_counts["channel_cap"] == 1
+
+
+def test_default_30_item_limit_handles_two_hours_of_four_minute_videos() -> None:
+    constraints = validate_proposal_arguments({
+        "topic": "recursion", "target_duration": "PT2H", "max_item_duration": "PT20M",
+    })
+    candidates = [
+        _make_video(f"rec_{i:07}", duration=240, channel_id=f"UC_group_{i // 3}")
+        for i in range(200)
+    ]
+    result = solve_playlist(candidates, constraints, now=_REF_NOW)
+    assert result.feasible and result.item_count == 30
+    assert result.total_duration_seconds == 7200
+    assert 51 + 50 * result.item_count == 1551

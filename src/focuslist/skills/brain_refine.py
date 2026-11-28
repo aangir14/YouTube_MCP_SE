@@ -95,6 +95,12 @@ def _rewrite_links_for_move(
     return updated, repairs
 
 
+def _frontmatter_list(value: object) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [str(item) for item in value if str(item).strip()]
+
+
 def _merge_note_records(
     existing_fm: dict[str, object],
     existing_body: str,
@@ -111,8 +117,8 @@ def _merge_note_records(
         merged_fm["author"] = f"{existing_author}; {incoming_author}".strip("; ")
 
     for list_key in ("srs_ids", "sources", "evidence", "uncertainty"):
-        base_vals = [str(x) for x in (existing_fm.get(list_key) or []) if str(x).strip()]
-        add_vals = [str(x) for x in (incoming_fm.get(list_key) or []) if str(x).strip()]
+        base_vals = _frontmatter_list(existing_fm.get(list_key))
+        add_vals = _frontmatter_list(incoming_fm.get(list_key))
         merged_fm[list_key] = list(dict.fromkeys([*base_vals, *add_vals]))
 
     clean_inc_body = incoming_body.strip()
@@ -305,7 +311,7 @@ def refine_vault(
                     f"| **{note_fm.get('title', dst)}** | [`{dst}`]({dst}) | "
                     f"{note_fm.get('author', 'Unknown')} | {note_fm.get('date', date_str)} | "
                     f"{note_fm.get('type', 'research-note')} | {note_fm.get('status', 'active')} | "
-                    f"{', '.join(str(x) for x in (note_fm.get('srs_ids') or []))} | — |"
+                    f"{', '.join(_frontmatter_list(note_fm.get('srs_ids')))} | — |"
                 )
         if additions:
             index_path.write_text(idx_text.rstrip() + "\n" + "\n".join(additions) + "\n", encoding="utf-8")

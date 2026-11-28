@@ -31,18 +31,18 @@ def test_migrations_from_empty_db_and_repeat_run_are_idempotent(tmp_path: Path) 
     clock = FakeClock(datetime(2026, 11, 27, 12, 0, tzinfo=UTC))
 
     storage = FocusListStorage(db_path, clock=clock)
-    assert storage.schema_version() == 1
+    assert storage.schema_version() == 2
     assert storage.journal_mode() == "wal"
     assert storage.foreign_keys_enabled() is True
 
     # Repeat migration call on the exact same DB
     applied_again = storage.run_migrations()
     assert applied_again == []
-    assert storage.schema_version() == 1
+    assert storage.schema_version() == 2
 
     # Second storage instance opening existing DB also runs repeat migrations safely
     storage_reopen = FocusListStorage(db_path, clock=clock)
-    assert storage_reopen.schema_version() == 1
+    assert storage_reopen.schema_version() == 2
 
 
 def test_cache_ttl_buckets_max_cap_and_invalid_values(tmp_path: Path) -> None:

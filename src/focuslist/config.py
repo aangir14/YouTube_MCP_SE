@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import math
 from pathlib import Path
 from typing import Literal
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from focuslist.ranking_weights import DEFAULT_SCORING_WEIGHTS
 
 ProviderMode = Literal["fixture", "live", "fault"]
 
@@ -36,6 +39,8 @@ class Settings(BaseSettings):
         default=Path("tests/fixtures"),
         description="Directory containing synthetic JSON replay fixtures",
     )
+
+    scoring_weights: dict[str, dict[str, float]] = Field(default_factory=dict)
 
     # Quota Limits & Safety Margin (SRS FR-10, NFR-QUOTA-01)
     daily_general_quota: int = Field(
@@ -137,6 +142,23 @@ class Settings(BaseSettings):
         if not (0.0 <= v < 0.5):
             raise ValueError("quota_safety_margin must be between 0.0 and 0.5")
         return v
+
+    @field_validator("scoring_weights", mode="before")
+    @classmethod
+    def validate_scoring_weights(cls, supplied: object) -> dict[str, dict[str, float]]:
+        if not isinstance(supplied, dict) or supplied.keys() - DEFAULT_SCORING_WEIGHTS.keys():
+            raise ValueError("Scoring weights must use the named FocusList rankers.")
+        active = {ranker: dict(weights) for ranker, weights in DEFAULT_SCORING_WEIGHTS.items()}
+        for ranker, weights in supplied.items():
+            if not isinstance(weights, dict) or weights.keys() != active[ranker].keys():
+                raise ValueError(f"Supply every named feature for {ranker}.")
+            if any(type(value) not in (int, float) or not 0 <= value <= 1
+                   for value in weights.values()) or not math.isclose(
+                math.fsum(weights.values()), 1.0, rel_tol=0.0, abs_tol=1e-12,
+            ):
+                raise ValueError(f"Weights for {ranker} must be in [0, 1] and sum to one.")
+            active[ranker] = {name: float(weights[name]) for name in active[ranker]}
+        return active
 
 
 _default_settings: Settings | None = None

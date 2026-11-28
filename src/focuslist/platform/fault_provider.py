@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any
 
 from focuslist.errors import (
@@ -20,9 +21,16 @@ from focuslist.errors import (
     VideoUnavailableError,
 )
 from focuslist.platform.provider import VideoProvider
-from focuslist.types import AccountActivityRecord, ChannelRecord, VideoRecord
+from focuslist.platform.write_contracts import WriteAuthorizationContext
+from focuslist.types import (
+    AccountActivityRecord,
+    ChannelRecord,
+    PlaylistInfo,
+    PlaylistPage,
+    VideoRecord,
+)
 
-NORMALIZED_FAULT_MAP: dict[str, type[FocusListError]] = {
+NORMALIZED_FAULT_MAP: dict[str, Callable[[str | None], FocusListError]] = {
     "quota": QuotaExhaustedError,
     "quota_budget": QuotaBudgetExceededError,
     "rate": RateLimitedError,
@@ -84,8 +92,7 @@ class FaultInjectionProvider(VideoProvider):
         if fault_kind not in NORMALIZED_FAULT_MAP:
             valid = ", ".join(sorted(NORMALIZED_FAULT_MAP))
             raise ValueError(f"Unknown fault_kind '{fault_kind}'. Expected one of: {valid}")
-        exc_cls = NORMALIZED_FAULT_MAP[fault_kind]
-        exc = exc_cls(message) if message else exc_cls()
+        exc = NORMALIZED_FAULT_MAP[fault_kind](message or None)
         counts_as_attempt = fault_kind not in _PREFLIGHT_FAULT_KINDS
         self.inject_fault(method_name, exc, count=count, counts_as_attempt=counts_as_attempt)
 
@@ -186,6 +193,16 @@ class FaultInjectionProvider(VideoProvider):
         self._before_call("get_categories")
         return self.target.get_categories(region_code=region_code)
 
+    def get_playlist_info(self, playlist_id: str) -> PlaylistInfo:
+        self._before_call("get_playlist_info")
+        return self.target.get_playlist_info(playlist_id)
+
+    def get_playlist_page(
+        self, playlist_id: str, page_token: str | None = None, *, page_size: int = 50,
+    ) -> PlaylistPage:
+        self._before_call("get_playlist_page")
+        return self.target.get_playlist_page(playlist_id, page_token, page_size=page_size)
+
     def check_channel_eligibility(self, account_id: str) -> bool:
         self._before_call("check_channel_eligibility")
         return self.target.check_channel_eligibility(account_id)
@@ -195,19 +212,39 @@ class FaultInjectionProvider(VideoProvider):
         title: str,
         description: str,
         privacy: str = "private",
+        *,
+        write_context: WriteAuthorizationContext | None = None,
     ) -> str:
         self._before_call("create_playlist", is_write=True)
-        return self.target.create_playlist(title, description, privacy=privacy)
+        return self.target.create_playlist(
+            title, description, privacy=privacy, write_context=write_context,
+        )
 
     def insert_playlist_item(
         self,
         playlist_id: str,
         video_id: str,
         position: int | None = None,
+        *,
+        write_context: WriteAuthorizationContext | None = None,
     ) -> str:
         self._before_call("insert_playlist_item", is_write=True)
-        return self.target.insert_playlist_item(playlist_id, video_id, position=position)
+        return self.target.insert_playlist_item(
+            playlist_id, video_id, position=position, write_context=write_context,
+        )
 
-    def delete_playlist(self, playlist_id: str) -> bool:
+    def delete_playlist(
+        self, playlist_id: str, *, write_context: WriteAuthorizationContext | None = None,
+    ) -> bool:
         self._before_call("delete_playlist", is_write=True)
-        return self.target.delete_playlist(playlist_id)
+        return self.target.delete_playlist(playlist_id, write_context=write_context)
+
+    def list_playlist_items_for_reconciliation(
+        self, playlist_id: str, max_results: int = 50,
+    ) -> list[str]:
+        self._before_call("list_playlist_items_for_reconciliation")
+        return self.target.list_playlist_items_for_reconciliation(playlist_id, max_results)
+
+    def find_created_playlist(self, title: str, description: str, privacy: str) -> str | None:
+        self._before_call("find_created_playlist")
+        return self.target.find_created_playlist(title, description, privacy)

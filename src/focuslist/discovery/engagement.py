@@ -338,7 +338,7 @@ def _compare_periods(
         channel_deltas.append(
             {
                 "channel_id": cid,
-                "channel_title": (cur_row or base_row)["channel_title"],
+                "channel_title": (cur_ch[cid] if cid in cur_ch else base_ch[cid])["channel_title"],
                 "current_count": cur_cnt,
                 "baseline_count": base_cnt if base_cnt is not None else 0,
                 "count_delta": d_cnt,
@@ -363,7 +363,9 @@ def _compare_periods(
         category_deltas.append(
             {
                 "category_id": cat_id,
-                "category_name": (cur_row or base_row)["category_name"],
+                "category_name": (
+                    cur_cat[cat_id] if cat_id in cur_cat else base_cat[cat_id]
+                )["category_name"],
                 "current_count": cur_cnt,
                 "baseline_count": base_cnt if base_cnt is not None else 0,
                 "count_delta": d_cnt,
@@ -498,25 +500,25 @@ class EngagementService:
             videos: dict[str, VideoRecord] = {}
             for offset in range(0, len(video_ids), _BATCH_SIZE):
                 batch = video_ids[offset : offset + _BATCH_SIZE]
-                for rec in read_with_accounting(
+                for video in read_with_accounting(
                     self.ctx,
                     self.provider,
                     partial(self.provider.get_video_details, batch),
                 ):
-                    norm = normalise_video_record(rec)
+                    norm = normalise_video_record(video)
                     videos[norm.video_id] = norm
 
             sub_ids = list(subs_by_id.keys())
             sub_channels: dict[str, ChannelRecord] = {}
             for offset in range(0, len(sub_ids), _BATCH_SIZE):
                 batch = sub_ids[offset : offset + _BATCH_SIZE]
-                for rec in read_with_accounting(
+                for channel in read_with_accounting(
                     self.ctx,
                     self.provider,
                     partial(self.provider.get_channels_details, batch),
                 ):
-                    norm = normalise_channel_record(rec)
-                    sub_channels[norm.channel_id] = norm
+                    normalised_channel = normalise_channel_record(channel)
+                    sub_channels[normalised_channel.channel_id] = normalised_channel
 
             raw_categories = read_with_accounting(
                 self.ctx,

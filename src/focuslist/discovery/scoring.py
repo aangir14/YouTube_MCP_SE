@@ -8,6 +8,8 @@ from collections import Counter
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from typing import Any, TypeVar
 
+from typing_extensions import TypedDict
+
 from focuslist.context import RequestContext
 from focuslist.errors import AuthRequiredError, FocusListError, QuotaBudgetExceededError
 from focuslist.metadata import primary_language
@@ -74,14 +76,14 @@ def build_tfidf_vectors(
 
 def mean_normalized_vector(vectors: Iterable[dict[str, float]]) -> dict[str, float]:
     """Compute the L2-normalized mean of non-empty TF-IDF vectors."""
-    summed: Counter[str] = Counter()
+    summed: dict[str, float] = {}
     count = 0
     for vec in vectors:
         if not vec:
             continue
         count += 1
         for term, weight in vec.items():
-            summed[term] += weight
+            summed[term] = summed.get(term, 0.0) + weight
     if count == 0:
         return {}
     mean_vec = {term: val / count for term, val in summed.items()}
@@ -144,6 +146,38 @@ def format_reason(
     if len(full) <= max_length:
         return full
     return full[: max_length - 3].rstrip() + "..."
+
+
+class ScoreExplanation(TypedDict):
+    score: float
+    components: dict[str, float]
+    feature_trace: dict[str, dict[str, float]]
+    shared_terms: list[str]
+    missing_fields: list[str]
+    low_confidence: bool
+    reason: str
+
+
+def explain_score(
+    raw: Mapping[str, float],
+    weights: Mapping[str, float],
+    *,
+    shared_terms: Sequence[str] = (),
+    missing_fields: Sequence[str] = (),
+    low_confidence: bool = False,
+) -> ScoreExplanation:
+    """Build the common FR-6 response without calling a provider."""
+    trace, score = build_feature_trace(raw, weights)
+    missing = sorted(set(missing_fields))
+    return {
+        "score": score,
+        "components": dict(weights),
+        "feature_trace": trace,
+        "shared_terms": list(dict.fromkeys(shared_terms))[:5],
+        "missing_fields": missing,
+        "low_confidence": low_confidence,
+        "reason": format_reason(trace),
+    }
 
 
 def resolve_authorized_account(

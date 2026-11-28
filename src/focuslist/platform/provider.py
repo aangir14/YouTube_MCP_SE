@@ -5,7 +5,14 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Any
 
-from focuslist.types import AccountActivityRecord, ChannelRecord, VideoRecord
+from focuslist.platform.write_contracts import WriteAuthorizationContext
+from focuslist.types import (
+    AccountActivityRecord,
+    ChannelRecord,
+    PlaylistInfo,
+    PlaylistPage,
+    VideoRecord,
+)
 
 
 class VideoProvider(ABC):
@@ -102,10 +109,34 @@ class VideoProvider(ABC):
         """Fetch available video categories for region (costs 1 unit, cached 7 days)."""
         ...
 
+    def get_playlist_info(self, playlist_id: str) -> PlaylistInfo:
+        """Verify readability and get the item count in one playlist lookup."""
+        raise NotImplementedError
+
+    def get_playlist_page(
+        self, playlist_id: str, page_token: str | None = None, *, page_size: int = 50,
+    ) -> PlaylistPage:
+        """Read one page of positions, including unavailable placeholders."""
+        raise NotImplementedError
+
     @abstractmethod
     def check_channel_eligibility(self, account_id: str) -> bool:
         """Check whether the user has an active YouTube channel for playlist creation."""
         ...
+
+    def owned_channel_ids(self, account_id: str) -> tuple[str, ...]:
+        """Return the channel identities needed to verify an incremental OAuth upgrade."""
+        return ()
+
+    def find_created_playlist(self, title: str, description: str, privacy: str) -> str | None:
+        """Return a unique match for the signed creation marker, if one is visible."""
+        return None
+
+    def list_playlist_items_for_reconciliation(
+        self, playlist_id: str, max_results: int = 50,
+    ) -> list[str]:
+        """Return a complete small playlist in confirmed position order."""
+        raise NotImplementedError
 
     @abstractmethod
     def create_playlist(
@@ -113,6 +144,8 @@ class VideoProvider(ABC):
         title: str,
         description: str,
         privacy: str = "private",
+        *,
+        write_context: WriteAuthorizationContext | None = None,
     ) -> str:
         """Create a new playlist and return its ID (costs 50 units)."""
         ...
@@ -123,11 +156,15 @@ class VideoProvider(ABC):
         playlist_id: str,
         video_id: str,
         position: int | None = None,
+        *,
+        write_context: WriteAuthorizationContext | None = None,
     ) -> str:
         """Insert a video into the specified playlist (costs 50 units per item)."""
         ...
 
     @abstractmethod
-    def delete_playlist(self, playlist_id: str) -> bool:
+    def delete_playlist(
+        self, playlist_id: str, *, write_context: WriteAuthorizationContext | None = None,
+    ) -> bool:
         """Delete an owned playlist for confirmed undo (costs 50 units)."""
         ...

@@ -3,16 +3,16 @@
 from __future__ import annotations
 
 import math
+from collections.abc import Mapping
 from functools import partial
 from threading import Lock
 from typing import Any
 
 from focuslist.context import RequestContext
 from focuslist.discovery.scoring import (
-    build_feature_trace,
     build_tfidf_vectors,
     cosine_and_shared_terms,
-    format_reason,
+    explain_score,
     mean_normalized_vector,
     most_frequent_primary_language,
     preflight_non_gateway,
@@ -30,6 +30,7 @@ from focuslist.metadata import (
 )
 from focuslist.platform.gateway import ProviderGateway
 from focuslist.platform.provider import VideoProvider
+from focuslist.ranking_weights import CHANNEL_WEIGHTS
 from focuslist.types import ChannelRecord, VideoRecord
 
 _SEARCH_CAP = 3
@@ -38,13 +39,6 @@ _CANDIDATE_CAP = 100
 _BATCH_SIZE = 50
 _RERANK_WINDOW = 10
 _UPLOAD_SAMPLE_CAP = 20
-
-CHANNEL_WEIGHTS: dict[str, float] = {
-    "text_cosine": 0.60,
-    "topic_overlap": 0.20,
-    "language_match": 0.10,
-    "size_fit": 0.10,
-}
 
 
 def _channel_text(channel: ChannelRecord) -> str:
@@ -103,11 +97,13 @@ def _score_channel_pair(
     text_cosine: float,
     shared_terms: list[str],
     seed_lang: str | None,
+    seed_lang_inferred: bool,
     cand_lang: str | None,
     cand_lang_inferred: bool,
     seed_has_text: bool,
     cand_has_text: bool,
     ranking_phase: str,
+    weights: Mapping[str, float],
 ) -> dict[str, Any]:
     seed_topics = _topic_set(seed)
     cand_topics = _topic_set(candidate)
@@ -134,8 +130,6 @@ def _score_channel_pair(
         "language_match": lang_match,
         "size_fit": size_fit,
     }
-    trace, score = build_feature_trace(raw, CHANNEL_WEIGHTS)
-
     missing: list[str] = []
     if not cand_has_text:
         missing.append("text")
@@ -145,9 +139,9 @@ def _score_channel_pair(
         missing.append("topic_categories")
     if not seed_topics:
         missing.append("seed.topic_categories")
-    if cand_lang is None:
+    if cand_lang is None or cand_lang_inferred:
         missing.append("language")
-    if seed_lang is None:
+    if seed_lang is None or seed_lang_inferred:
         missing.append("seed.language")
     if cand_subs is None:
         missing.append("subscriber_count")
@@ -155,7 +149,6 @@ def _score_channel_pair(
         missing.append("seed.subscriber_count")
     if candidate.keywords is None:
         missing.append("keywords")
-    missing = sorted(set(missing))
 
     low_confidence = (
         not cand_has_text
@@ -165,8 +158,8 @@ def _score_channel_pair(
         or cand_lang != "en"
         or seed_lang != "en"
         or cand_lang_inferred
+        or seed_lang_inferred
     )
-    reason = format_reason(trace)
 
     return {
         "item_id": candidate.channel_id,
@@ -174,13 +167,8 @@ def _score_channel_pair(
         "canonical_url": candidate.canonical_url,
         "title": candidate.title,
         "handle": candidate.handle,
-        "score": score,
-        "reason": reason,
-        "components": dict(CHANNEL_WEIGHTS),
-        "feature_trace": trace,
-        "shared_terms": shared_terms,
-        "missing_fields": missing,
-        "low_confidence": low_confidence,
+        **explain_score(raw, weights, shared_terms=shared_terms, missing_fields=missing,
+                        low_confidence=low_confidence),
         "ranking_phase": ranking_phase,
         "subscriber_count": cand_subs,
         "hidden_subscriber_count": candidate.hidden_subscriber_count,
@@ -196,6 +184,7 @@ def rank_similar_channels_two_pass(
     seed_uploads: list[VideoRecord],
     candidates: list[ChannelRecord],
     candidate_uploads_by_id: dict[str, list[VideoRecord]] | None = None,
+    *, weights: Mapping[str, float] = CHANNEL_WEIGHTS,
 ) -> list[dict[str, Any]]:
     """Rank eligible channels in two deterministic passes (Pass 1 metadata, Pass 2 top-10 uploads)."""
     if not candidates:
@@ -207,7 +196,7 @@ def rank_similar_channels_two_pass(
     }
     meta_vectors = build_tfidf_vectors(meta_docs)
     seed_meta_vec = meta_vectors[seed.channel_id]
-    seed_lang, _ = _effective_channel_language(seed, seed_uploads)
+    seed_lang, seed_inferred = _effective_channel_language(seed, seed_uploads)
 
     pass1_rows: list[dict[str, Any]] = []
     for cand in candidates:
@@ -221,11 +210,13 @@ def rank_similar_channels_two_pass(
                 text_cosine=text_cos,
                 shared_terms=shared,
                 seed_lang=seed_lang,
+                seed_lang_inferred=seed_inferred,
                 cand_lang=cand_lang,
                 cand_lang_inferred=cand_inferred,
                 seed_has_text=bool(seed_meta_vec),
                 cand_has_text=bool(cand_vec),
                 ranking_phase="metadata_first_pass",
+                weights=weights,
             )
         )
 
@@ -291,11 +282,13 @@ def rank_similar_channels_two_pass(
                 text_cosine=blended_cos,
                 shared_terms=merged_shared,
                 seed_lang=seed_lang,
+                seed_lang_inferred=seed_inferred,
                 cand_lang=cand_lang,
                 cand_lang_inferred=cand_inferred,
                 seed_has_text=bool(seed_meta_vec) or bool(seed_upload_centroid),
                 cand_has_text=bool(cand_meta_vec) or bool(cand_upload_centroid),
                 ranking_phase=phase,
+                weights=weights,
             )
         )
 
@@ -379,7 +372,8 @@ class ChannelDiscovery:
                         eligible_by_id[norm.channel_id] = norm
 
             eligible = list(eligible_by_id.values())
-            pass1 = rank_similar_channels_two_pass(seed, seed_uploads, eligible)
+            weights = self.ctx.settings.scoring_weights["similar_channels"]
+            pass1 = rank_similar_channels_two_pass(seed, seed_uploads, eligible, weights=weights)
             top_window_ids = [row["channel_id"] for row in pass1[:_RERANK_WINDOW]]
 
             uploads_by_id: dict[str, list[VideoRecord]] = {}
@@ -398,7 +392,7 @@ class ChannelDiscovery:
                 ]
 
             ranked = rank_similar_channels_two_pass(
-                seed, seed_uploads, eligible, candidate_uploads_by_id=uploads_by_id
+                seed, seed_uploads, eligible, candidate_uploads_by_id=uploads_by_id, weights=weights,
             )[:limit]
 
             warnings: list[str] = []

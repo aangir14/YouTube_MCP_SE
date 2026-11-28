@@ -566,7 +566,7 @@ Each entry is one authored commit and one reviewed PR. The sections inside it re
 
 **Commit message** `feat(platform): integrate storage quota OAuth and offline checks`
 
-- [ ] In progress · Actual date (IST) 2026-11-27 · Evidence: Implemented SQLite cache/migrations (`storage.py`, `focuslist purge`), atomic quota/gateway (`quota.py`, `gateway.py`, wired to C15 proposals & `estimate_quota`/`get_quota_status`/`focuslist quota`), PKCE OAuth & isolated credential store (`auth.py`, `focuslist auth`), bounded write primitives & guarded placeholder `confirm_playlist`/`undo_playlist` (`live_provider.py`, `write_contracts.py`, `server.py`), `local-check`/`brain-refine` skills (`SKE-SK1` 15.27s, `SKE-SK4`), opening PR fixture CI (`.github/workflows/pr-fixture-ci.yml`), `ADR-006`, and `docs/testing/c16-platform-and-skills-evidence.md`. Verified offline: `ruff check .` clean, `pytest -v` 231 passed. PR #15 opened (https://github.com/aangir14/YouTube_MCP_SE/pull/15); pending both-teammate FR-9 review. <!-- C16-status -->
+- [ ] Follow-up required · Merged on 2026-11-27 (IST) in [PR #15](https://github.com/aangir14/YouTube_MCP_SE/pull/15). Storage, mock OAuth, guarded writes, quota fixtures and both developer skills passed. The repaired CI gate passed locally on Linux Python 3.11 and 3.12. Composite-call quota enforcement, fixture CI isolation, the hosted run and both teammate FR-9 reviews remain open. [Original evidence](docs/testing/c16-platform-and-skills-evidence.md) · [Audit results](docs/testing/c16-c17-verification.md) <!-- C16-status -->
 
 Stabilise storage, quota, credentials and provider writes. Package the two developer skills and land a fixture-only PR gate for the next five changes.
 
@@ -657,7 +657,7 @@ I am Aangir Doshi, the owner of C16. Apply the Shared Antigravity instructions. 
 
 **Commit message** `feat(discovery): deliver channel recommendations and engagement tools`
 
-- [x] Done · Actual date (IST) 2026-11-28 · Evidence — ruff check src tests: All checks passed; pytest -q: 235 passed, 0 failed in 35.66s (commands run 2026-11-28); tools verified: similar_channels (FR-2, two-pass reranking), recommend_videos (FR-3, consent gate, NO_PROFILE_DATA), analyse_engagement (FR-4, UTC periods, comparison deltas, histogram, timestamp provenance); tests: ST-FR2, ST-FR3, ST-FR4, NEG-INPUT, NEG-PROFILE, NEG-METADATA; fixture MCP stdio system test passed; ADR-002 updated (FR-3 weights reconciled to SRS 0.60/0.15/0.15/0.10); mcp-reference.md regenerated; branch c17/channels-recommendations-engagement <!-- C17-status -->
+- [ ] Follow-up required · Merged on 2026-11-27 (IST) in [PR #16](https://github.com/aangir14/YouTube_MCP_SE/pull/16). FR-2, FR-3 and FR-4 passed the fixture MCP stdio checks. The SRS recommendation weights and engagement timestamp fallback are in place. Mocked official-provider paths exceeded the FR-2 and FR-3 general-unit limits. Remaining acceptance cases and teammate review are open. [Audit results](docs/testing/c16-c17-verification.md) <!-- C17-status -->
 
 Ship FR-2, FR-3 and FR-4 over the shared authorised read and quota contracts.
 
@@ -712,7 +712,7 @@ I am Ayush Patel, the owner of C17. Apply the Shared Antigravity instructions. R
 
 **Commit message** `feat(curation): secure playlist approval creation and recovery`
 
-- [ ] Pending · Actual date (IST) — · Evidence — <!-- C18-status -->
+- [ ] Implemented and verified offline · Actual date (IST) 2026-11-28 · Evidence: 282 tests passed on Linux Python 3.11 and 3.12, including 1,000 generated constraint cases, 15 synthetic hostile metadata cases, and real fixture MCP create, replay, restart, resume and undo. Approval and execution coverage were 93% and 91%. Ruff, mypy and fixture compliance passed with the CI repair. Hosted CI, the chosen AI client and both teammate FR-7 reviews remain pending. [Verification](docs/testing/c18-playlist-approval-evidence.md) <!-- C18-status -->
 
 Complete FR-5, FR-7 and FR-8 through the same stored-action flow, from ordering and proposal through approved creation, recovery and undo.
 
@@ -789,7 +789,7 @@ I am Harshil Srivastav, the owner of C18. Apply the Shared Antigravity instructi
 
 **Commit message** `feat(analysis): explain rankings and deliver playlist audit`
 
-- [ ] Pending · Actual date (IST) — · Evidence — <!-- C19-status -->
+- [ ] Implemented and verified offline · Actual date (IST) 2026-11-29 · Evidence: Both rankers used 20 frozen C08 seeds and returned precision@5 0.53 and MRR 0.904166666667. Weighted precision missed the provisional target by 0.07, with defaults retained under TBD-4. Both FR-12 tools capped the 501-position fixture at 500 with 21 reads and zero writes. All three SKE-SK6 cases passed, including zero-call quota denial. Ruff, mypy, compliance and 296 tests passed on Linux Python 3.11 and 3.12. Hosted benchmark and teammate review are pending. [Verification](docs/testing/c19-ranking-and-playlist-audit-evidence.md) <!-- C19-status -->
 
 Finish FR-6 score explanations and measured ranking comparison. Deliver FR-12 analysis and SK-6 with bounded provider reads.
 

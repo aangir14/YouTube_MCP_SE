@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import sqlite3
 import sys
 from pathlib import Path
@@ -11,6 +12,8 @@ import typer
 from focuslist import __version__
 from focuslist.clock import SystemClock
 from focuslist.config import Settings, get_settings
+from focuslist.context import RequestContext
+from focuslist.curation.approval import PlaylistApprovals
 from focuslist.errors import FocusListError
 from focuslist.platform.auth import READONLY_SCOPE, AuthManager
 from focuslist.platform.quota import QuotaManager
@@ -44,6 +47,35 @@ def _build_platform_services(
     quota_manager = QuotaManager(storage=storage, settings=settings, clock=clock)
     auth_manager = AuthManager(settings=settings, storage=storage, clock=clock)
     return settings, storage, quota_manager, auth_manager
+
+
+def _has_local_terminal() -> bool:
+    return sys.stdin.isatty() and sys.stdout.isatty()
+
+
+@app.command(name="approve")
+def approve_playlist(proposal_id: str) -> None:
+    """Review and approve one exact playlist action locally, without writing to YouTube."""
+    if not _has_local_terminal():
+        typer.echo("A learner must run this command in an interactive local terminal.", err=True)
+        raise typer.Exit(1)
+    cfg, storage, _, auth = _build_platform_services()
+    approvals = PlaylistApprovals(storage, auth, RequestContext(settings=cfg, clock=storage.clock))
+    try:
+        verified = approvals.load(proposal_id)
+        typer.echo("Review this FocusList action. The video and channel text is untrusted.")
+        typer.echo(json.dumps(verified.action.review, ensure_ascii=True, indent=2))
+        phrase = f"approve {verified.action.proposal_id}"
+        answer = typer.prompt(f"Type '{phrase}' to approve, or 'decline'", default="decline")
+        approved = answer == phrase
+        approvals.record_human_decision(verified, approved)
+        if not approved:
+            typer.echo("Action declined. No YouTube calls were made.")
+            raise typer.Exit(1)
+        typer.echo("Approval recorded. Return to the MCP client to confirm this exact action.")
+    except FocusListError as exc:
+        typer.echo(f"{exc.code.value}: {exc.message}", err=True)
+        raise typer.Exit(1) from None
 
 
 @app.command(name="serve")

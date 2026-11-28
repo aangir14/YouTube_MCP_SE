@@ -20,14 +20,17 @@ jobs:
 
     env:
       FOCUSLIST_PROVIDER: fixture
-      FOCUSLIST_DB_PATH: ${{ runner.temp }}/ci_focuslist.db
-      FOCUSLIST_AUTH_STORE_DIR: ${{ runner.temp }}/ci_auth
       FOCUSLIST_OAUTH_CLIENT_FILE: ""
       PYTHONIOENCODING: utf-8
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Set isolated fixture paths
+        run: |
+          printf '%s\n' "FOCUSLIST_DB_PATH=$RUNNER_TEMP/ci_focuslist.db" \
+            "FOCUSLIST_AUTH_STORE_DIR=$RUNNER_TEMP/ci_auth" >> "$GITHUB_ENV"
 
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5

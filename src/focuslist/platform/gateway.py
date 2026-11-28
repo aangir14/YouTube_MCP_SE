@@ -8,7 +8,7 @@ import time
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Any, TypeVar
+from typing import Any, Literal, TypeVar
 
 from focuslist.clock import Clock, SystemClock
 from focuslist.config import Settings, get_settings
@@ -26,7 +26,13 @@ from focuslist.platform.provider import VideoProvider
 from focuslist.platform.quota import METHOD_COSTS, QuotaManager, QuotaReservation
 from focuslist.platform.storage import FocusListStorage
 from focuslist.platform.write_contracts import AmbiguousWriteError
-from focuslist.types import AccountActivityRecord, ChannelRecord, VideoRecord
+from focuslist.types import (
+    AccountActivityRecord,
+    ChannelRecord,
+    PlaylistInfo,
+    PlaylistPage,
+    VideoRecord,
+)
 
 _T = TypeVar("_T")
 
@@ -180,6 +186,7 @@ class ProviderGateway(VideoProvider):
         is_write: bool = False,
         expected_units: int | None = None,
         expected_searches: int | None = None,
+        allow_retry: bool = True,
     ) -> _T:
         """Execute a provider method with atomic preflight, per-attempt charging, and COM-5 retry."""
         self.requests += 1
@@ -195,7 +202,7 @@ class ProviderGateway(VideoProvider):
             reservation = local_reservation
 
         is_live = hasattr(self.provider, "_attempt_observer")
-        retries_remaining = 0 if is_write else self.settings.max_retries
+        retries_remaining = self.settings.max_retries if allow_retry and not is_write else 0
         attempt_idx = 0
 
         try:
@@ -212,12 +219,10 @@ class ProviderGateway(VideoProvider):
                         scope=scope,
                         reservation=reservation,
                     )
-                    if isinstance(exc, QuotaExhaustedError):
-                        bucket = "search" if req_s > 0 and req_u == 0 else "general"
-                        self.quota_manager.mark_exhausted(bucket)
-                        raise
-                    if isinstance(exc, RateLimitedError):
-                        bucket = "search" if req_s > 0 and req_u == 0 else "general"
+                    if isinstance(exc, (QuotaExhaustedError, RateLimitedError)):
+                        bucket: Literal["search", "general"] = (
+                            "search" if req_s > 0 and req_u == 0 else "general"
+                        )
                         self.quota_manager.mark_exhausted(bucket)
                         raise
 
@@ -549,6 +554,29 @@ class ProviderGateway(VideoProvider):
             expected_searches=0,
         )
 
+    def get_playlist_info(self, playlist_id: str) -> PlaylistInfo:
+        return self._execute_with_accounting(
+            "get_playlist_info", lambda: self.provider.get_playlist_info(playlist_id),
+            allow_retry=False,
+        )
+
+    def get_playlist_page(
+        self, playlist_id: str, page_token: str | None = None, *, page_size: int = 50,
+    ) -> PlaylistPage:
+        return self._execute_with_accounting(
+            "get_playlist_page",
+            lambda: self.provider.get_playlist_page(playlist_id, page_token, page_size=page_size),
+            allow_retry=False,
+        )
+
+    def get_playlist_video_details(self, video_ids: list[str]) -> list[VideoRecord]:
+        """Hydrate one batch without putting account-sensitive data in the shared video cache."""
+        if not 1 <= len(video_ids) <= _MAX_BATCH_SIZE:
+            raise ValueError("Playlist detail lookups require a single nonempty batch.")
+        return self._execute_with_accounting(
+            "get_video_details", lambda: self.provider.get_video_details(video_ids), allow_retry=False,
+        )
+
     def get_categories(self, region_code: str = "US") -> list[dict[str, Any]]:
         params = {"region_code": region_code}
         if self.cache_enabled:
@@ -573,6 +601,28 @@ class ProviderGateway(VideoProvider):
             lambda: self.provider.check_channel_eligibility(account_id),
             expected_units=1,
             expected_searches=0,
+            allow_retry=False,
+        )
+
+    def owned_channel_ids(self, account_id: str) -> tuple[str, ...]:
+        return self._execute_with_accounting(
+            "owned_channel_ids", lambda: self.provider.owned_channel_ids(account_id),
+            expected_units=1, expected_searches=0, allow_retry=False,
+        )
+
+    def list_playlist_items_for_reconciliation(
+        self, playlist_id: str, max_results: int = 50,
+    ) -> list[str]:
+        return self._execute_with_accounting(
+            "list_playlist_items_for_reconciliation",
+            lambda: self.provider.list_playlist_items_for_reconciliation(playlist_id, max_results),
+            expected_units=1, expected_searches=0, allow_retry=False,
+        )
+
+    def find_created_playlist(self, title: str, description: str, privacy: str) -> str | None:
+        return self._execute_with_accounting(
+            "find_created_playlist", lambda: self.provider.find_created_playlist(title, description, privacy),
+            expected_units=1, expected_searches=0, allow_retry=False,
         )
 
     def create_playlist(

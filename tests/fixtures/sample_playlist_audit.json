@@ -1,0 +1,9 @@
+{
+  "PL_syn_audit001": [
+    {"video_id": "syn_vid0001"},
+    {"video_id": "syn_vid0002"},
+    {"video_id": "syn_vid0001"},
+    {"availability_hint": "deleted"},
+    {"video_id": "syn_vid0900", "availability_hint": "private"}
+  ]
+}

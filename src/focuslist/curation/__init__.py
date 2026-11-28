@@ -14,7 +14,6 @@ from focuslist.curation.constraints import (
     validate_proposal_arguments,
 )
 from focuslist.curation.proposals import (
-    ProposalSignerHook,
     QuotaPreflightHook,
     propose_playlist_action,
 )
@@ -38,7 +37,6 @@ __all__ = [
     "HARD_MAX_ITEMS",
     "ConstraintViolation",
     "PlaylistProposalRequest",
-    "ProposalSignerHook",
     "QuotaPreflightHook",
     "ScoredCandidate",
     "SelectedPlaylistItem",

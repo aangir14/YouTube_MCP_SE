@@ -8,14 +8,15 @@ Auto-generated from `focuslist.server.create_server()` FastMCP tool, resource, a
 | :--- | :--- | :--- |
 | `analyse_engagement` | Analyze viewing and engagement patterns across categories, channels, and durations. | `sources` |
 | `analyse_playlist` | Summarize a public or user playlist's duration distribution and topics. | `playlist_url_or_id` |
-| `audit_playlist` | Audit a playlist for unavailable, duplicate, overlong, or stale videos. | `playlist_url_or_id` |
+| `audit_playlist` | Audit a playlist for unavailable, duplicate, overlong, stale, live or upcoming items. | `playlist_url_or_id` |
 | `auth_status` | Inspect current Google OAuth authorization status, scopes, and token age. | `*(none)*` |
-| `confirm_playlist` | Confirm and execute an approved playlist creation action using proposal ID and token. | `proposal_id, token` |
+| `confirm_playlist` | Execute the stored playlist action only after a separate human approval. | `proposal_id, token` |
 | `estimate_quota` | Estimate the worst-case quota units and search calls for a planned tool call. | `target_tool` |
 | `get_quota_status` | Inspect the local quota ledger: general units and search calls remaining today. | `*(none)*` |
 | `get_video_details` | Fetch verified metadata fact sheet and public statistics for a YouTube video. | `video_url_or_id` |
 | `propose_playlist` | Formulate an immutable, constraint-bounded playlist proposal for user review. | `topic, target_duration, max_item_duration` |
 | `recommend_videos` | Recommend videos tailored to the learner's authorized likes, subscriptions, and playlists. | `sources` |
+| `resume_playlist` | Check an interrupted creation and propose only its remaining insertions. | `proposal_id` |
 | `similar_channels` | Discover channels covering similar topics to a seed channel handle or ID. | `channel_url_handle_or_id` |
 | `similar_videos` | Discover and rank YouTube videos similar to a seed video using metadata similarity. | `video_url_or_id` |
 | `undo_playlist` | Propose deletion of a FocusList-created playlist within the 30-day retention window. | `playlist_id` |
@@ -24,8 +25,9 @@ Auto-generated from `focuslist.server.create_server()` FastMCP tool, resource, a
 
 | URI | Name | Description |
 | :--- | :--- | :--- |
-| `focuslist://config/scoring` | `get_scoring_weights` | Active scoring component weights configuration. |
+| `focuslist://config/scoring` | `get_scoring_weights` | Return the active named weights for FR-1, FR-2, FR-3 and FR-5. |
 | `focuslist://quota/status` | `get_quota_resource` | Plaintext quota ledger resource. |
+| `focuslist://skills/playlist-audit` | `get_playlist_audit_skill` | Return the SK-6 read-only audit instructions. |
 
 ## Registered Prompts
 
@@ -105,6 +107,11 @@ Auto-generated from `focuslist.server.create_server()` FastMCP tool, resource, a
 ```json
 {
   "properties": {
+    "item_limit": {
+      "default": 500,
+      "title": "Item Limit",
+      "type": "integer"
+    },
     "playlist_url_or_id": {
       "title": "Playlist Url Or Id",
       "type": "string"
@@ -123,6 +130,11 @@ Auto-generated from `focuslist.server.create_server()` FastMCP tool, resource, a
 ```json
 {
   "properties": {
+    "item_limit": {
+      "default": 500,
+      "title": "Item Limit",
+      "type": "integer"
+    },
     "max_item_length_minutes": {
       "anyOf": [
         {
@@ -138,6 +150,11 @@ Auto-generated from `focuslist.server.create_server()` FastMCP tool, resource, a
     "playlist_url_or_id": {
       "title": "Playlist Url Or Id",
       "type": "string"
+    },
+    "stale_after_years": {
+      "default": 5,
+      "title": "Stale After Years",
+      "type": "integer"
     }
   },
   "required": [
@@ -378,6 +395,24 @@ Auto-generated from `focuslist.server.create_server()` FastMCP tool, resource, a
     "sources"
   ],
   "title": "recommend_videosArguments",
+  "type": "object"
+}
+```
+
+### `resume_playlist`
+
+```json
+{
+  "properties": {
+    "proposal_id": {
+      "title": "Proposal Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "proposal_id"
+  ],
+  "title": "resume_playlistArguments",
   "type": "object"
 }
 ```

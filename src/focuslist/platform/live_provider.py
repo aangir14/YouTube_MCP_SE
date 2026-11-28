@@ -2,17 +2,19 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from collections import defaultdict
 from collections.abc import Callable
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from focuslist.config import Settings, get_settings
 from focuslist.errors import (
     AuthExpiredError,
     AuthRequiredError,
     ChannelUnavailableError,
+    ErrorCode,
     FocusListError,
     InvalidArgumentsError,
     NetworkTimeoutError,
@@ -41,6 +43,9 @@ from focuslist.platform.write_contracts import (
 from focuslist.types import (
     AccountActivityRecord,
     ChannelRecord,
+    PlaylistEntry,
+    PlaylistInfo,
+    PlaylistPage,
     VideoRecord,
     sanitize_untrusted_text,
 )
@@ -107,6 +112,7 @@ class LiveVideoProvider(VideoProvider):
         self._auth_manager = auth_manager
         self._http_transport = http_transport
         self._service = service
+        self._injected_service = service is not None
         self._attempt_observer = attempt_observer
 
         self.call_counts: dict[str, int] = defaultdict(int)
@@ -137,9 +143,22 @@ class LiveVideoProvider(VideoProvider):
         )
         return google_auth_httplib2.AuthorizedHttp(credentials, http=base_http)
 
-    def _ensure_service(self, *, require_write: bool = False) -> Any:
+    def _ensure_service(
+        self, *, require_write: bool = False,
+        write_context: WriteAuthorizationContext | None = None,
+    ) -> Any:
         """Resolve injected credentials/service, verify scopes, or raise AuthRequiredError."""
-        if require_write and self._auth_manager is not None:
+        if self._auth_manager is not None and not self._injected_service:
+            stored = self._auth_manager.ensure_valid_session(require_write=require_write)
+            if write_context is not None and (
+                write_context.credential_fingerprint
+                != hashlib.sha256(stored.access_token.encode()).digest()
+            ):
+                raise AuthRequiredError("The approved YouTube session changed before dispatch.")
+            if self._credentials is None or stored.access_token != self._credentials.token:
+                self._service = None
+                self._credentials = self._auth_manager.google_credentials_for(stored)
+        elif require_write and self._auth_manager is not None:
             self._auth_manager.ensure_valid_session(require_write=True)
 
         if self._service is not None:
@@ -184,6 +203,7 @@ class LiveVideoProvider(VideoProvider):
         request_obj: Any,
         *,
         is_channel: bool = False,
+        is_playlist: bool = False,
     ) -> dict[str, Any]:
         """Execute a single Google API request, recording attempt and mapping errors safely."""
         from googleapiclient.errors import HttpError
@@ -200,6 +220,10 @@ class LiveVideoProvider(VideoProvider):
             ) from exc
         except HttpError as exc:
             status, reason = _extract_http_error_info(exc)
+            if is_playlist and (
+                status == 404 or (status == 403 and reason == "playlistItemsNotAccessible")
+            ):
+                raise FocusListError(ErrorCode.PLAYLIST_UNAVAILABLE) from exc
             if status == 401:
                 raise AuthExpiredError(
                     "OAuth access token was rejected (HTTP 401). Re-authenticate."
@@ -703,6 +727,60 @@ class LiveVideoProvider(VideoProvider):
                 break
         return records
 
+    def get_playlist_info(self, playlist_id: str) -> PlaylistInfo:
+        self.call_counts["get_playlist_info"] += 1
+        self.requests += 1
+        service = self._ensure_service()
+        response = self._execute_request(
+            "playlists.list", service.playlists().list(part="contentDetails", id=playlist_id),
+            is_playlist=True,
+        )
+        for item in response.get("items", ()):
+            if isinstance(item, dict) and item.get("id") == playlist_id:
+                return PlaylistInfo(_safe_int((item.get("contentDetails") or {}).get("itemCount")))
+        raise FocusListError(ErrorCode.PLAYLIST_UNAVAILABLE)
+
+    def get_playlist_page(
+        self, playlist_id: str, page_token: str | None = None, *, page_size: int = 50,
+    ) -> PlaylistPage:
+        self.call_counts["get_playlist_page"] += 1
+        self.requests += 1
+        service = self._ensure_service()
+        limit = max(1, min(page_size, _MAX_BATCH_SIZE))
+        parameters: dict[str, Any] = {
+            "part": "snippet,contentDetails", "playlistId": playlist_id, "maxResults": limit,
+        }
+        if page_token:
+            parameters["pageToken"] = page_token
+        response = self._execute_request(
+            "playlistItems.list", service.playlistItems().list(**parameters), is_playlist=True,
+        )
+        rows = response.get("items")
+        if not isinstance(rows, list):
+            raise UpstreamFailureError("Missing playlist page data.")
+        entries = []
+        for row in rows[:limit]:
+            if not isinstance(row, dict):
+                entries.append(PlaylistEntry())
+                continue
+            snippet = row.get("snippet") or {}
+            content = row.get("contentDetails") or {}
+            video_id = content.get("videoId") or (snippet.get("resourceId") or {}).get("videoId")
+            title = str(snippet.get("title") or "").strip().casefold()
+            hint: Literal["private", "deleted"] | None = None
+            if title == "private video":
+                hint = "private"
+            elif title == "deleted video":
+                hint = "deleted"
+            entries.append(PlaylistEntry(
+                video_id=video_id if isinstance(video_id, str) and video_id else None,
+                availability_hint=hint,
+            ))
+        token = response.get("nextPageToken")
+        if token is not None and not isinstance(token, str):
+            raise UpstreamFailureError("Invalid playlist pagination metadata.")
+        return PlaylistPage(tuple(entries), token or None)
+
     def get_categories(self, region_code: str = "US") -> list[dict[str, Any]]:
         self.call_counts["get_categories"] += 1
         self.requests += 1
@@ -726,6 +804,9 @@ class LiveVideoProvider(VideoProvider):
         return categories
 
     def check_channel_eligibility(self, account_id: str) -> bool:
+        return bool(self.owned_channel_ids(account_id))
+
+    def owned_channel_ids(self, account_id: str) -> tuple[str, ...]:
         self.call_counts["check_channel_eligibility"] += 1
         self.requests += 1
         service = self._ensure_service()
@@ -735,7 +816,10 @@ class LiveVideoProvider(VideoProvider):
             service.channels().list(part="id", mine=True),
             is_channel=True,
         )
-        return bool(resp.get("items"))
+        return tuple(sorted({
+            item["id"] for item in resp.get("items", [])
+            if isinstance(item, dict) and isinstance(item.get("id"), str) and item["id"]
+        }))
 
     def require_channel_eligibility(self, account_id: str) -> bool:
         """Verify the authorized user owns an active YouTube channel or raise NO_YOUTUBE_CHANNEL."""
@@ -797,7 +881,7 @@ class LiveVideoProvider(VideoProvider):
 
         self.call_counts["create_playlist"] += 1
         self.requests += 1
-        service = self._ensure_service(require_write=True)
+        service = self._ensure_service(require_write=True, write_context=ctx)
 
         body = {
             "snippet": {
@@ -814,9 +898,7 @@ class LiveVideoProvider(VideoProvider):
         )
         playlist_id = resp.get("id")
         if not isinstance(playlist_id, str) or not playlist_id.strip():
-            raise UpstreamFailureError(
-                "YouTube playlists.insert returned no playlist identifier."
-            )
+            raise AmbiguousWriteError("playlists.insert")
         self.writes += 1
         return playlist_id.strip()
 
@@ -828,17 +910,19 @@ class LiveVideoProvider(VideoProvider):
         *,
         write_context: WriteAuthorizationContext | None = None,
     ) -> str:
-        self._require_write_context(write_context, allowed_actions={"create", "resume"})
+        ctx = self._require_write_context(write_context, allowed_actions={"create", "resume"})
         if not isinstance(playlist_id, str) or not playlist_id.strip():
             raise InvalidArgumentsError("playlist_id is required for playlist item insertion.")
         if not isinstance(video_id, str) or not video_id.strip():
             raise InvalidArgumentsError("video_id is required for playlist item insertion.")
         if position is not None and (isinstance(position, bool) or position < 0):
             raise InvalidArgumentsError("position must be a non-negative integer.")
+        if not ctx.permits_insertion(playlist_id, video_id, position):
+            raise InvalidArgumentsError("The video, target or position differs from the approved action.")
 
         self.call_counts["insert_playlist_item"] += 1
         self.requests += 1
-        service = self._ensure_service(require_write=True)
+        service = self._ensure_service(require_write=True, write_context=ctx)
 
         snippet: dict[str, Any] = {
             "playlistId": playlist_id.strip(),
@@ -859,8 +943,8 @@ class LiveVideoProvider(VideoProvider):
         )
         item_id = resp.get("id")
         if not isinstance(item_id, str) or not item_id.strip():
-            raise UpstreamFailureError(
-                "YouTube playlistItems.insert returned no playlistItem identifier."
+            raise AmbiguousWriteError(
+                "playlistItems.insert", playlist_id=playlist_id, video_id=video_id, position=position,
             )
         self.writes += 1
         return item_id.strip()
@@ -879,7 +963,7 @@ class LiveVideoProvider(VideoProvider):
 
         self.call_counts["delete_playlist"] += 1
         self.requests += 1
-        service = self._ensure_service(require_write=True)
+        service = self._ensure_service(require_write=True, write_context=ctx)
 
         from googleapiclient.errors import HttpError
 
@@ -931,12 +1015,30 @@ class LiveVideoProvider(VideoProvider):
                 maxResults=cap,
             ),
         )
+        if resp.get("nextPageToken") or not isinstance(resp.get("items"), list):
+            raise InvalidArgumentsError("Could not verify the complete playlist for recovery.")
         ids: list[str] = []
-        for item in resp.get("items", []):
-            if isinstance(item, dict):
-                vid = (item.get("contentDetails") or {}).get("videoId") or (
-                    (item.get("snippet") or {}).get("resourceId") or {}
-                ).get("videoId")
-                if isinstance(vid, str) and vid:
-                    ids.append(vid)
+        for index, item in enumerate(resp["items"]):
+            if not isinstance(item, dict):
+                raise InvalidArgumentsError("Playlist position could not be verified for recovery.")
+            snippet = item.get("snippet") or {}
+            video_id = (item.get("contentDetails") or {}).get("videoId")
+            if snippet.get("position") != index or not isinstance(video_id, str) or not video_id:
+                raise InvalidArgumentsError("Playlist position could not be verified for recovery.")
+            ids.append(video_id)
         return ids
+
+    def find_created_playlist(self, title: str, description: str, privacy: str) -> str | None:
+        service = self._ensure_service()
+        resp = self._execute_request(
+            "playlists.list",
+            service.playlists().list(part="snippet,status", mine=True, maxResults=25),
+        )
+        ids = [
+            row["id"] for row in resp.get("items", [])
+            if isinstance(row, dict) and isinstance(row.get("id"), str)
+            and (row.get("snippet") or {}).get("title") == title
+            and (row.get("snippet") or {}).get("description") == description
+            and (row.get("status") or {}).get("privacyStatus") == privacy
+        ]
+        return ids[0] if len(ids) == 1 else None

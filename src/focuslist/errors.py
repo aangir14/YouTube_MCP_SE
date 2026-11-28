@@ -13,6 +13,7 @@ class ErrorCode(str, Enum):
     INVALID_CHANNEL_ID = "INVALID_CHANNEL_ID"
     INVALID_ARGUMENTS = "INVALID_ARGUMENTS"
     VIDEO_UNAVAILABLE = "VIDEO_UNAVAILABLE"
+    PLAYLIST_UNAVAILABLE = "PLAYLIST_UNAVAILABLE"
     CHANNEL_UNAVAILABLE = "CHANNEL_UNAVAILABLE"
     QUOTA_BUDGET_EXCEEDED = "QUOTA_BUDGET_EXCEEDED"
     QUOTA_EXHAUSTED = "QUOTA_EXHAUSTED"
@@ -50,6 +51,11 @@ ERROR_REGISTRY: dict[ErrorCode, tuple[str, str, bool]] = {
     ErrorCode.VIDEO_UNAVAILABLE: (
         "The requested video is private, deleted, or geographically restricted.",
         "Verify video availability on YouTube or choose an accessible alternative.",
+        False,
+    ),
+    ErrorCode.PLAYLIST_UNAVAILABLE: (
+        "The playlist does not exist or is not readable with the current authorization.",
+        "Check the playlist reference and its access permissions.",
         False,
     ),
     ErrorCode.CHANNEL_UNAVAILABLE: (
