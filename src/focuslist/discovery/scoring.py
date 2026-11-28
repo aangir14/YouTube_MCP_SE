@@ -74,14 +74,14 @@ def build_tfidf_vectors(
 
 def mean_normalized_vector(vectors: Iterable[dict[str, float]]) -> dict[str, float]:
     """Compute the L2-normalized mean of non-empty TF-IDF vectors."""
-    summed: Counter[str] = Counter()
+    summed: dict[str, float] = {}
     count = 0
     for vec in vectors:
         if not vec:
             continue
         count += 1
         for term, weight in vec.items():
-            summed[term] += weight
+            summed[term] = summed.get(term, 0.0) + weight
     if count == 0:
         return {}
     mean_vec = {term: val / count for term, val in summed.items()}

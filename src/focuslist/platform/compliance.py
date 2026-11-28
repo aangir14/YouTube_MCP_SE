@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from focuslist.config import Settings
-from focuslist.skills.validator import validate_all_skills
+from focuslist.skills.validator import SkillInventory, validate_all_skills
 
 _REPO_SECRET_PATTERNS = (
     re.compile(r"ya29\.[A-Za-z0-9\-_]{8,}"),
@@ -41,9 +41,9 @@ class ComplianceReport:
     """Result of running offline C16 CI compliance checks."""
 
     passed: bool
+    skill_validation: SkillInventory
     import_violations: list[str] = field(default_factory=list)
     secret_findings: list[str] = field(default_factory=list)
-    skill_validation: dict[str, Any] = field(default_factory=dict)
     reference_in_sync: bool = True
     pending_checks: list[str] = field(default_factory=list)
 

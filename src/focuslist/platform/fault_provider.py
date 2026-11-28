@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any
 
 from focuslist.errors import (
@@ -22,7 +23,7 @@ from focuslist.errors import (
 from focuslist.platform.provider import VideoProvider
 from focuslist.types import AccountActivityRecord, ChannelRecord, VideoRecord
 
-NORMALIZED_FAULT_MAP: dict[str, type[FocusListError]] = {
+NORMALIZED_FAULT_MAP: dict[str, Callable[[str | None], FocusListError]] = {
     "quota": QuotaExhaustedError,
     "quota_budget": QuotaBudgetExceededError,
     "rate": RateLimitedError,
@@ -84,8 +85,7 @@ class FaultInjectionProvider(VideoProvider):
         if fault_kind not in NORMALIZED_FAULT_MAP:
             valid = ", ".join(sorted(NORMALIZED_FAULT_MAP))
             raise ValueError(f"Unknown fault_kind '{fault_kind}'. Expected one of: {valid}")
-        exc_cls = NORMALIZED_FAULT_MAP[fault_kind]
-        exc = exc_cls(message) if message else exc_cls()
+        exc = NORMALIZED_FAULT_MAP[fault_kind](message or None)
         counts_as_attempt = fault_kind not in _PREFLIGHT_FAULT_KINDS
         self.inject_fault(method_name, exc, count=count, counts_as_attempt=counts_as_attempt)
 

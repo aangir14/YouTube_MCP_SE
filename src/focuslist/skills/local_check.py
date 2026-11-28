@@ -9,7 +9,7 @@ import subprocess
 import sys
 import tempfile
 import time
-from collections.abc import Awaitable, Callable, Sequence
+from collections.abc import Callable, Coroutine, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal
@@ -49,7 +49,7 @@ class LocalCheckReport:
 
 
 CommandRunner = Callable[[Sequence[str], Path, dict[str, str]], tuple[int, str]]
-McpProbeFn = Callable[[Path, Path, str], Awaitable[dict[str, Any]]]
+McpProbeFn = Callable[[Path, Path, str], Coroutine[Any, Any, dict[str, Any]]]
 
 
 def _default_command_runner(
@@ -97,6 +97,8 @@ async def _default_mcp_probe(
             "get_video_details", {"video_url_or_id": video_id}
         )
         assert not tool_res.isError, "MCP protocol error during fixture lookup"
+        if not tool_res.content or tool_res.content[0].type != "text":
+            raise ValueError("Fixture lookup returned no MCP text content.")
         payload = json.loads(tool_res.content[0].text)
         return {
             "server_name": init_res.serverInfo.name,
