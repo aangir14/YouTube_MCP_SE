@@ -206,6 +206,7 @@ def test_live_write_error_mappings_and_ambiguous_timeout_no_duplicate_retry(tmp_
         account_id="acc_1",
         action_kind="create",
         approved_title="Study",
+        approved_video_ids=("vid_1",),
     )
 
     # Insufficient permission (403 forbidden) -> AuthRequiredError

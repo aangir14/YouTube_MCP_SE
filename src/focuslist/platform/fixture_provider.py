@@ -7,8 +7,10 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
+from focuslist.errors import InvalidArgumentsError
 from focuslist.metadata import normalise_channel_record, normalise_video_record
 from focuslist.platform.provider import VideoProvider
+from focuslist.platform.write_contracts import WriteAuthorizationContext
 from focuslist.types import (
     AccountActivityRecord,
     ChannelRecord,
@@ -323,11 +325,16 @@ class FixtureVideoProvider(VideoProvider):
         title: str,
         description: str,
         privacy: str = "private",
+        *,
+        write_context: WriteAuthorizationContext | None = None,
     ) -> str:
         self._record_call(
             "create_playlist", is_write=True, title=title, privacy=privacy
         )
-        pid = f"PL_syn_{len(self._created_playlists) + 1:04d}"
+        pid = (
+            f"PL_syn_{write_context.proposal_id[5:]}"
+            if write_context else f"PL_syn_{len(self._created_playlists) + 1:04d}"
+        )
         self._created_playlists[pid] = {
             "title": title,
             "description": description,
@@ -341,6 +348,8 @@ class FixtureVideoProvider(VideoProvider):
         playlist_id: str,
         video_id: str,
         position: int | None = None,
+        *,
+        write_context: WriteAuthorizationContext | None = None,
     ) -> str:
         self._record_call(
             "insert_playlist_item",
@@ -364,9 +373,27 @@ class FixtureVideoProvider(VideoProvider):
             items.append(video_id)
         return item_id
 
-    def delete_playlist(self, playlist_id: str) -> bool:
+    def delete_playlist(
+        self, playlist_id: str, *, write_context: WriteAuthorizationContext | None = None,
+    ) -> bool:
         self._record_call("delete_playlist", is_write=True, playlist_id=playlist_id)
         if playlist_id in self._created_playlists:
             del self._created_playlists[playlist_id]
             return True
         return False
+
+    def list_playlist_items_for_reconciliation(
+        self, playlist_id: str, max_results: int = 50,
+    ) -> list[str]:
+        if playlist_id not in self._created_playlists:
+            self._record_call("list_playlist_items_for_reconciliation", playlist_id=playlist_id)
+            raise InvalidArgumentsError("Could not verify a locally created fixture playlist.")
+        return [row.item_id for row in self.get_playlist_items(playlist_id, max_results)]
+
+    def find_created_playlist(self, title: str, description: str, privacy: str) -> str | None:
+        self._record_call("find_created_playlist")
+        matches = [
+            pid for pid, row in self._created_playlists.items()
+            if (row["title"], row["description"], row["privacy"]) == (title, description, privacy)
+        ]
+        return matches[0] if len(matches) == 1 else None

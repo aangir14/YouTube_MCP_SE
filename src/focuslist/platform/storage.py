@@ -9,6 +9,7 @@ import hashlib
 import json
 import os
 import sqlite3
+import sys
 from collections.abc import Iterator
 from contextlib import closing, contextmanager
 from dataclasses import dataclass
@@ -22,6 +23,7 @@ from focuslist.errors import (
     ConfirmationInvalidError,
     InvalidArgumentsError,
 )
+from focuslist.platform.write_contracts import ActionKind
 
 # SRS FR-11.4 Cache TTLs & DB-3 Retention Windows (seconds)
 TTL_VIDEO_SECONDS = 86_400  # 24 hours
@@ -161,6 +163,15 @@ _SCHEMA_V1_STATEMENTS: tuple[str, ...] = (
 
 SCHEMA_MIGRATIONS: tuple[tuple[int, str, tuple[str, ...]], ...] = (
     (1, "Initial cache, quota ledger, proposals, write progress, and action history", _SCHEMA_V1_STATEMENTS),
+    (2, "Human approvals bound to proposal content", (
+        "ALTER TABLE proposals ADD COLUMN authorized_grant TEXT",
+        """
+        CREATE TABLE proposal_approvals (
+            proposal_id TEXT PRIMARY KEY REFERENCES proposals(proposal_id) ON DELETE CASCADE,
+            approval_hash TEXT NOT NULL
+        )
+        """,
+    )),
 )
 
 
@@ -204,7 +215,7 @@ class StoredProposal:
     """Persisted proposal state returned by the SQLite repository."""
 
     proposal_id: str
-    action_kind: str
+    action_kind: ActionKind
     owner_account_id: str
     title: str
     privacy_status: str
@@ -222,6 +233,7 @@ class StoredProposal:
     result: dict[str, Any] | None
     created_at: int
     updated_at: int
+    authorized_grant: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -328,16 +340,15 @@ class FocusListStorage:
                 )
                 """
             )
-            existing = {
-                int(row["version"])
-                for row in conn.execute("SELECT version FROM schema_migrations").fetchall()
-            }
             now_epoch = self.clock.now_epoch()
             for version, description, statements in SCHEMA_MIGRATIONS:
-                if version in existing:
-                    continue
                 conn.execute("BEGIN IMMEDIATE")
                 try:
+                    if conn.execute(
+                        "SELECT 1 FROM schema_migrations WHERE version = ?", (version,)
+                    ).fetchone():
+                        conn.execute("COMMIT")
+                        continue
                     for stmt in statements:
                         conn.execute(stmt)
                     conn.execute(
@@ -555,7 +566,7 @@ class FocusListStorage:
     def _row_to_proposal(row: sqlite3.Row) -> StoredProposal:
         return StoredProposal(
             proposal_id=str(row["proposal_id"]),
-            action_kind=str(row["action_kind"]),
+            action_kind=row["action_kind"],
             owner_account_id=str(row["owner_account_id"]),
             title=str(row["title"]),
             privacy_status=str(row["privacy_status"]),
@@ -573,6 +584,7 @@ class FocusListStorage:
             result=json.loads(row["result_json"]) if row["result_json"] else None,
             created_at=int(row["created_at"]),
             updated_at=int(row["updated_at"]),
+            authorized_grant=row["authorized_grant"],
         )
 
     def save_proposal(
@@ -588,6 +600,7 @@ class FocusListStorage:
         canonical_hash: str,
         expires_at: datetime,
         target_playlist_id: str | None = None,
+        supersede: bool = False,
     ) -> StoredProposal:
         """Persist an immutable proposal with unique ID and expiry+7d retention (never stores token)."""
         if not proposal_id or not owner_account_id or not canonical_hash:
@@ -598,6 +611,15 @@ class FocusListStorage:
 
         try:
             with self.transaction(immediate=True) as conn:
+                if supersede:
+                    conn.execute(
+                        """
+                        UPDATE proposals SET state = 'superseded', updated_at = ?
+                        WHERE owner_account_id = ? AND action_kind = ?
+                          AND target_playlist_id IS ? AND state = 'proposed'
+                        """,
+                        (now_epoch, owner_account_id, action_kind, target_playlist_id),
+                    )
                 conn.execute(
                     """
                     INSERT INTO proposals (
@@ -678,6 +700,7 @@ class FocusListStorage:
         owner_account_id: str,
         expected_action_kind: str,
         expected_hash: str,
+        expected_approval: str | None = None,
     ) -> ProposalClaimResult:
         """Atomically claim a valid, unexpired proposal before any YouTube write (DB-2, FR-7)."""
         now_epoch = self.clock.now_epoch()
@@ -706,7 +729,7 @@ class FocusListStorage:
                     recorded_result=proposal.result,
                 )
 
-            if proposal.state == "expired" or now_epoch > proposal.expires_at:
+            if proposal.state == "expired" or now_epoch >= proposal.expires_at:
                 if proposal.state == "proposed":
                     conn.execute(
                         "UPDATE proposals SET state = 'expired', updated_at = ? WHERE proposal_id = ?",
@@ -718,6 +741,14 @@ class FocusListStorage:
                 raise ConfirmationInvalidError(
                     f"Proposal is in state '{proposal.state}' and cannot be claimed."
                 )
+
+            if expected_approval is not None:
+                approved = conn.execute(
+                    "DELETE FROM proposal_approvals WHERE proposal_id = ? AND approval_hash = ?",
+                    (proposal_id, expected_approval),
+                )
+                if approved.rowcount != 1:
+                    raise ConfirmationInvalidError("A separate human approval is required.")
 
             cur = conn.execute(
                 """
@@ -743,6 +774,73 @@ class FocusListStorage:
                 proposal=self._row_to_proposal(updated_row),
             )
 
+    def record_proposal_decision(
+        self, proposal_id: str, canonical_hash: str, approval_hash: str | None,
+    ) -> None:
+        now = self.clock.now_epoch()
+        with self.transaction(immediate=True) as conn:
+            row = conn.execute(
+                "SELECT state, canonical_hash, expires_at FROM proposals WHERE proposal_id = ?",
+                (proposal_id,),
+            ).fetchone()
+            if row is None or row["state"] != "proposed" or row["canonical_hash"] != canonical_hash:
+                raise ConfirmationInvalidError("The reviewed proposal changed or is no longer open.")
+            if now >= row["expires_at"]:
+                raise ConfirmationExpiredError()
+            if approval_hash is None:
+                conn.execute("DELETE FROM proposal_approvals WHERE proposal_id = ?", (proposal_id,))
+                conn.execute(
+                    "UPDATE proposals SET state = 'invalidated', updated_at = ? WHERE proposal_id = ?",
+                    (now, proposal_id),
+                )
+            else:
+                conn.execute(
+                    "INSERT OR REPLACE INTO proposal_approvals VALUES (?, ?)",
+                    (proposal_id, approval_hash),
+                )
+
+    def has_proposal_approval(self, proposal_id: str, approval_hash: str) -> bool:
+        with closing(self._connect()) as conn:
+            return conn.execute(
+                "SELECT 1 FROM proposal_approvals WHERE proposal_id = ? AND approval_hash = ?",
+                (proposal_id, approval_hash),
+            ).fetchone() is not None
+
+    @contextmanager
+    def playlist_execution_lock(self) -> Iterator[None]:
+        """Serialize playlist dispatch and recovery across processes using the same database."""
+        path = self.db_path.resolve().with_suffix(self.db_path.suffix + ".playlist.lock")
+        fd = os.open(path, os.O_CREAT | os.O_RDWR, 0o600)
+        try:
+            try:
+                if sys.platform == "win32":
+                    import msvcrt
+
+                    msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
+                else:
+                    import fcntl
+
+                    fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except OSError:
+                raise ConfirmationInvalidError("A playlist action is already running.") from None
+            yield
+        finally:
+            os.close(fd)
+
+    def next_playlist_write_at(self) -> float:
+        with closing(self._connect()) as conn:
+            row = conn.execute(
+                "SELECT value FROM storage_meta WHERE key = 'next_playlist_write_at'"
+            ).fetchone()
+        return float(row[0]) if row else 0.0
+
+    def set_next_playlist_write_at(self, timestamp: float) -> None:
+        with self.transaction(immediate=True) as conn:
+            conn.execute(
+                "INSERT OR REPLACE INTO storage_meta (key, value) VALUES ('next_playlist_write_at', ?)",
+                (str(timestamp),),
+            )
+
     def update_proposal_execution(
         self,
         proposal_id: str,
@@ -754,6 +852,9 @@ class FocusListStorage:
         inserted_count: int | None = None,
         failed_step_code: str | None = None,
         result: dict[str, Any] | None = None,
+        authorized_grant: str | None = None,
+        audit_outcome: str | None = None,
+        audit_result: dict[str, Any] | None = None,
     ) -> StoredProposal:
         """Update execution state and progress fields for a claimed proposal."""
         now_epoch = self.clock.now_epoch()
@@ -784,6 +885,7 @@ class FocusListStorage:
                     inserted_count = ?,
                     failed_step_code = ?,
                     result_json = ?,
+                    authorized_grant = COALESCE(?, authorized_grant),
                     updated_at = ?
                 WHERE proposal_id = ?
                 """,
@@ -794,6 +896,7 @@ class FocusListStorage:
                     new_inserted,
                     new_failed,
                     new_result_json,
+                    authorized_grant,
                     now_epoch,
                     proposal_id,
                 ),
@@ -803,6 +906,21 @@ class FocusListStorage:
                 (proposal_id,),
             ).fetchone()
             assert updated is not None
+            if audit_outcome is not None:
+                conn.execute(
+                    """
+                    INSERT INTO action_history (
+                        timestamp_epoch, proposal_id, proposal_hash, action_kind,
+                        account_id, target_playlist_id, inserted_count, outcome,
+                        failed_step_code, retain_until, result_json
+                    ) SELECT ?, proposal_id, canonical_hash, action_kind,
+                        owner_account_id, target_playlist_id, inserted_count, ?, ?,
+                        ?, ? FROM proposals WHERE proposal_id = ?
+                    """,
+                    (now_epoch, audit_outcome, failed_step_code,
+                     now_epoch + ACTION_RETENTION_SECONDS,
+                     json.dumps(audit_result) if audit_result else None, proposal_id),
+                )
             return self._row_to_proposal(updated)
 
     def record_write_progress(
@@ -964,11 +1082,14 @@ class FocusListStorage:
             conn.close()
         created = False
         undone = False
+        deleting = False
         for row in rows:
             kind = str(row["action_kind"])
             outcome = str(row["outcome"]).lower()
-            if kind in {"create", "resume"} and outcome in {"created", "partially_created", "resumed"}:
+            if kind == "create" and outcome in {"created", "partially_created"}:
                 created = True
             if kind == "undo" and outcome == "undone":
                 undone = True
-        return created and not undone
+            if kind == "undo" and outcome in {"undo_started", "undo_rejected"}:
+                deleting = outcome == "undo_started"
+        return created and not undone and not deleting

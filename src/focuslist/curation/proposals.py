@@ -5,11 +5,10 @@ from __future__ import annotations
 import math
 from collections.abc import Callable
 from contextlib import nullcontext
-from datetime import timedelta
 from typing import Any
-from uuid import uuid4
 
 from focuslist.context import RequestContext
+from focuslist.curation.approval import PlaylistApprovals
 from focuslist.curation.constraints import (
     ValidatedPlaylistConstraints,
     validate_proposal_arguments,
@@ -20,16 +19,14 @@ from focuslist.metadata import normalise_video_record
 from focuslist.platform.gateway import ProviderGateway
 from focuslist.platform.provider import VideoProvider
 from focuslist.platform.quota import QuotaManager
-from focuslist.types import VideoRecord, format_duration_display
+from focuslist.types import VideoRecord, format_duration_display, sanitize_untrusted_text
 
 _MAX_SEARCH_CALLS = 3
 _MAX_DETAIL_BATCHES = 3
 _PROPOSAL_READ_BASELINE_UNITS = 15
-_PROPOSAL_EXPIRY_MINUTES = 30
 
 # Type aliases for eventual C21 (signing) and quota hooks
 QuotaPreflightHook = Callable[[int, int], None]
-ProposalSignerHook = Callable[[dict[str, Any]], str]
 
 
 def _retrieve_bounded_candidates(
@@ -131,7 +128,7 @@ def propose_playlist_action(
     provider: VideoProvider,
     context: RequestContext,
     quota_preflight: QuotaPreflightHook | None = None,
-    signer: ProposalSignerHook | None = None,
+    approvals: PlaylistApprovals | None = None,
     quota_manager: QuotaManager | None = None,
 ) -> dict[str, Any]:
     """Validate constraints, retrieve bounded metadata, solve, and return read-only proposal.
@@ -215,10 +212,6 @@ def propose_playlist_action(
     now = context.clock.now()
     result: SolverResult = solve_playlist(candidates, constraints, now=now)
 
-    deferred_seams = ["C16_sqlite_persistence", "C21_hmac_signing_and_confirm"]
-    if active_qm is None:
-        deferred_seams.insert(1, "C19_committed_quota_ledger")
-
     if not result.feasible:
         resp = context.success(
             {
@@ -249,24 +242,10 @@ def propose_playlist_action(
         resp["meta"]["cache_hits"] = context.cache_hits - before_hits
         return resp
 
-    proposal_id = f"prop_{uuid4().hex[:12]}"
-    resolved_title = constraints.title or f"{constraints.topic} - {now.strftime('%Y-%m-%d')}"
-    expires_at = now + timedelta(minutes=_PROPOSAL_EXPIRY_MINUTES)
-    estimated_write_cost = 51 + (50 * result.item_count)
-
-    canonical_payload = {
-        "proposal_id": proposal_id,
-        "action_kind": "create",
-        "title": resolved_title,
-        "privacy_status": constraints.privacy_status,
-        "ordered_video_ids": [item.video_id for item in result.selected_items],
-        "expires_at": expires_at.isoformat(),
-    }
-    token = (
-        signer(canonical_payload)
-        if signer is not None
-        else f"pending_c21_hmac_signing:{proposal_id}"
+    resolved_title = constraints.title or (
+        f"{sanitize_untrusted_text(constraints.topic, 87)} - {now:%Y-%m-%d}"
     )
+    estimated_write_cost = 51 + (50 * result.item_count)
 
     items_payload = [
         {
@@ -286,11 +265,7 @@ def propose_playlist_action(
         for item in result.selected_items
     ]
 
-    resp = context.success(
-        {
-            "status": "PROPOSED",
-            "proposal_id": proposal_id,
-            "action_kind": "create",
+    review = {
             "title": resolved_title,
             "topic": constraints.topic,
             "privacy_status": constraints.privacy_status,
@@ -302,21 +277,29 @@ def propose_playlist_action(
             "total_duration_seconds": result.total_duration_seconds,
             "total_score": result.total_score,
             "estimated_write_cost": estimated_write_cost,
-            "expires_at": expires_at.isoformat(),
-            "expires_in_minutes": _PROPOSAL_EXPIRY_MINUTES,
-            "confirmation_token": token,
             "constraint_status": result.constraint_status,
             "filtered_out_counts": result.filtered_out_counts,
             "items": items_payload,
+            "sessions": [session.model_dump() for session in result.sessions],
             "warnings": result.warnings,
             "writes_executed": 0,
-            "deferred_seams": deferred_seams,
             "note": (
                 "Read-only proposal generated with 0 writes. Review the exact list above; "
                 "separate explicit human confirmation is required before creation."
             ),
-        }
-    ).model_dump()
+    }
+    try:
+        if approvals is not None:
+            review = approvals.issue(
+                "create", {**review, "status": "PROPOSED"}, title=resolved_title,
+                privacy=constraints.privacy_status,
+                video_ids=[item.video_id for item in result.selected_items],
+            )
+        else:
+            review.update(status="PREVIEW", proposal_id=None, confirmation_token=None)
+        resp = context.success(review).model_dump()
+    except FocusListError as exc:
+        resp = context.failure(exc).model_dump()
     resp["meta"]["quota_used"] = context.quota_used - before_units
     resp["meta"]["search_calls"] = context.search_calls_used - before_searches
     resp["meta"]["cache_hits"] = context.cache_hits - before_hits

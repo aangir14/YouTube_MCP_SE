@@ -12,6 +12,12 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field
 
 from focuslist.curation.constraints import ValidatedPlaylistConstraints
+from focuslist.curation.ordering import (
+    StudySession,
+    diversify_candidates,
+    order_candidates,
+    pack_sessions,
+)
 from focuslist.metadata import (
     format_duration_iso,
     normalise_video_record,
@@ -135,6 +141,7 @@ class SolverResult(BaseModel):
     unmet_constraints: list[ConstraintViolation] = Field(default_factory=list)
     filtered_out_counts: dict[str, int] = Field(default_factory=dict)
     warnings: list[str] = Field(default_factory=list)
+    sessions: list[StudySession] = Field(default_factory=list)
 
 
 def filter_eligible_candidates(
@@ -317,9 +324,9 @@ def _is_better_solution(
 def _to_selected_items(
     indices: tuple[int, ...],
     ordered: list[ScoredCandidate],
+    constraints: ValidatedPlaylistConstraints,
 ) -> list[SelectedPlaylistItem]:
-    chosen = [ordered[i] for i in indices]
-    chosen.sort(key=lambda c: (-c.score, c.video.video_id))
+    chosen = order_candidates([ordered[i] for i in indices], constraints.ordering)
     items: list[SelectedPlaylistItem] = []
     for idx, cand in enumerate(chosen, start=1):
         dur = cand.video.duration_seconds or 0
@@ -369,6 +376,8 @@ def solve_playlist(
     else:
         scored = score_candidates_fr5(eligible, constraints, ref_now)
 
+    scored, diversity_drops = diversify_candidates(scored)
+    dropped.update(diversity_drops)
     # Sort deterministically so candidate permutation never changes solver outcome
     ordered = sorted(scored, key=lambda c: (-c.score, c.video.video_id))
 
@@ -447,14 +456,14 @@ def solve_playlist(
                     new_states.append((nxt_dur, nxt_count, nxt_score, nxt_indices))
 
         for nxt_dur, nxt_count, nxt_score, nxt_indices in new_states:
-            bucket = dp.get(nxt_dur)
-            if bucket is None:
+            next_bucket = dp.get(nxt_dur)
+            if next_bucket is None:
                 dp[nxt_dur] = [(nxt_count, nxt_score, nxt_indices)]
                 continue
             # Check dominance
             dominated = False
             filtered_bucket: list[tuple[int, float, tuple[int, ...]]] = []
-            for b_cnt, b_scr, b_idx in bucket:
+            for b_cnt, b_scr, b_idx in next_bucket:
                 if b_cnt <= nxt_count and round(b_scr, 6) >= round(nxt_score, 6):
                     if b_cnt < nxt_count or round(b_scr, 6) > round(nxt_score, 6):
                         dominated = True
@@ -474,7 +483,7 @@ def solve_playlist(
     warnings: list[str] = []
     if best_feasible is not None:
         score_val, dur_val, idx_tuple = best_feasible
-        items = _to_selected_items(idx_tuple, ordered)
+        items = _to_selected_items(idx_tuple, ordered, constraints)
         if any(item.unknown_language_flagged for item in items):
             warnings.append("Some selected items have unknown language (explicitly allowed).")
         return SolverResult(
@@ -496,12 +505,15 @@ def solve_playlist(
             },
             filtered_out_counts=dropped,
             warnings=warnings,
+            sessions=pack_sessions(items, constraints.session_minutes),
         )
 
     # Infeasible: check if a single over-target or combined set was closest above t_high
     # (already bounded by d <= max_item_duration, and nearest_under holds max reachable < t_low)
     nearest_dur = nearest_under[0] if nearest_under is not None else 0
-    nearest_items = _to_selected_items(nearest_under[2], ordered) if nearest_under is not None else []
+    nearest_items = _to_selected_items(
+        nearest_under[2], ordered, constraints
+    ) if nearest_under is not None else []
     deficit = nearest_dur - t_low
 
     unmet = [
@@ -577,7 +589,7 @@ def greedy_baseline_select(
         constraints.target_lower_seconds <= total_dur <= constraints.target_upper_seconds
         and len(chosen_indices) > 0
     )
-    items = _to_selected_items(tuple(chosen_indices), ordered) if feasible else []
+    items = _to_selected_items(tuple(chosen_indices), ordered, constraints) if feasible else []
     return SolverResult(
         feasible=feasible,
         selected_items=items,

@@ -410,9 +410,9 @@ class LoopbackOAuthListener:
             def do_GET(self) -> None:
                 parsed = urlsplit(self.path)
                 params = parse_qs(parsed.query, keep_blank_values=True)
-                err = (params.get("error") or [None])[0]
-                state = (params.get("state") or [None])[0]
-                code = (params.get("code") or [None])[0]
+                err = next(iter(params.get("error", ())), None)
+                state = next(iter(params.get("state", ())), None)
+                code = next(iter(params.get("code", ())), None)
 
                 if err == "access_denied":
                     outer.error = AuthCancelledError(
@@ -447,7 +447,7 @@ class LoopbackOAuthListener:
                 return
 
         self._server = HTTPServer(("127.0.0.1", 0), _CallbackHandler)
-        self.host, self.port = self._server.server_address
+        self.host, self.port = self._server.server_address[:2]
         self.redirect_uri = f"http://127.0.0.1:{self.port}/callback"
         self._thread = threading.Thread(target=self._serve_loop, daemon=True)
         self.closed = False
@@ -731,9 +731,14 @@ class AuthManager:
 
     def build_google_credentials(self, *, require_write: bool = False) -> Any:
         """Construct a google.oauth2.credentials.Credentials instance (platform-confined)."""
+        creds = self.ensure_valid_session(require_write=require_write)
+        return self.google_credentials_for(creds)
+
+    @staticmethod
+    def google_credentials_for(creds: StoredOAuthCredentials) -> Any:
+        """Build Google credentials for the exact session already validated by the caller."""
         from google.oauth2.credentials import Credentials as GoogleCredentials
 
-        creds = self.ensure_valid_session(require_write=require_write)
         return GoogleCredentials(
             token=creds.access_token,
             refresh_token=creds.refresh_token,
@@ -742,6 +747,17 @@ class AuthManager:
             client_secret=creds.client_secret,
             scopes=list(creds.scopes),
         )
+
+    def grant_binding(self) -> str | None:
+        """Non-bearer identifier that changes when the local OAuth grant is replaced."""
+        creds = self.credential_store.load_credentials()
+        if creds is None:
+            return None
+        material = json.dumps([
+            creds.client_id, creds.account_id, creds.refresh_token_issued_at.isoformat(),
+            creds.refresh_token or creds.access_token,
+        ])
+        return hashlib.sha256(material.encode()).hexdigest()
 
     def get_status(self) -> AuthStatusSnapshot:
         """Report current authorization status, scopes, and token age without token values."""

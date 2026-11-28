@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import TypedDict
 
 _SKILL_NAME_RE = re.compile(r"^[a-z0-9-]{1,64}$")
 _MARKDOWN_LINK_RE = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
@@ -170,12 +171,19 @@ def validate_skill_dir(skill_dir: Path, *, repo_root: Path | None = None) -> Ski
     )
 
 
+class SkillInventory(TypedDict):
+    valid: bool
+    results: list[SkillValidationResult]
+    present_skills: list[str]
+    pending_skills: list[str]
+
+
 def validate_all_skills(
     skills_root: Path,
     *,
     repo_root: Path | None = None,
     require_all_six: bool = False,
-) -> dict[str, object]:
+) -> SkillInventory:
     """Validate all packaged skills currently present and report pending inventory."""
     root = repo_root or skills_root.parent
     present_dirs = (

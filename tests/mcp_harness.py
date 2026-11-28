@@ -10,7 +10,7 @@ from contextlib import AsyncExitStack
 from pathlib import Path
 from typing import Any, Self
 
-from mcp.client.session import ClientSession
+from mcp.client.session import ClientSession, ElicitationFnT
 from mcp.client.stdio import StdioServerParameters, stdio_client
 
 
@@ -23,11 +23,13 @@ class McpStdioTestClient:
         fixture_dir: Path | str | None = None,
         extra_env: dict[str, str] | None = None,
         server_args: list[str] | None = None,
+        elicitation_callback: ElicitationFnT | None = None,
     ) -> None:
         self.provider = provider
         self.fixture_dir = Path(fixture_dir) if fixture_dir else None
         self.extra_env = extra_env or {}
         self.server_args = server_args
+        self.elicitation_callback = elicitation_callback
         self._stack = AsyncExitStack()
         self._session: ClientSession | None = None
         self._init_result: Any = None
@@ -62,7 +64,7 @@ class McpStdioTestClient:
             stdio_client(server_params, errlog=self._stderr_file)
         )
         self._session = await self._stack.enter_async_context(
-            ClientSession(read_stream, write_stream)
+            ClientSession(read_stream, write_stream, elicitation_callback=self.elicitation_callback)
         )
         self._init_result = await self._session.initialize()
         return self

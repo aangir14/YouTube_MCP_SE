@@ -50,3 +50,7 @@ Per YouTube Data API v3 documentation (`developers.google.com/youtube/v3/determi
   - Search (`search.list`): **1 search call** (100 Google units; isolated in FocusList's 100-search bucket).
   - Write calls (`playlists.insert`, `playlistItems.insert`, `playlists.delete`): **50 general units** per mutation.
 - Final live Cloud Console cost parity check remains scheduled in **C22** (`CI-LIVE`).
+
+## 3. Open quota enforcement finding
+
+The C16–C17 audit reproduced composite reads exceeding their FR-2 and FR-3 general-unit reservations with the official provider and a synthetic mock service. The gateway accounts for observed endpoints after a provider method returns, so the reservation does not bound its individual endpoints or pages. The platform still needs to enforce the available budget before dispatching each charged attempt, including pages and retries. Keep FR-10 and NFR-QUOTA-01 open for these paths. [Audit evidence](../testing/c16-c17-verification.md#quota-findings)

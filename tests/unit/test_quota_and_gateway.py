@@ -216,7 +216,7 @@ def test_c15_proposal_uses_observed_charges_and_enforces_both_buckets(tmp_path: 
         provider=gateway,
         context=ctx,
     )
-    assert res["result"]["status"] == "PROPOSED"
+    assert res["result"]["status"] == "PREVIEW"
     # Observed charge: 1 search call, 0 general units (not fixed 15)
     assert res["meta"]["search_calls"] == 1
     assert res["meta"]["quota_used"] == 0
@@ -229,7 +229,7 @@ def test_c15_proposal_uses_observed_charges_and_enforces_both_buckets(tmp_path: 
         provider=gateway,
         context=RequestContext(settings=cfg, clock=clock),
     )
-    assert res2["result"]["status"] == "PROPOSED"
+    assert res2["result"]["status"] == "PREVIEW"
     assert qm.get_status().search_calls_remaining == 2
 
     # Now only 2 searches remain (< 3 worst-case for propose_playlist) -> rejected with 0 calls

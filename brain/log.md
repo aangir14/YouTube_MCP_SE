@@ -238,3 +238,16 @@ This append-only log tracks additions, modifications, decision milestones, and s
 - **Tests:** ST-FR2, ST-FR3, ST-FR4, NEG-INPUT, NEG-PROFILE, NEG-METADATA unit tests; MCP stdio system test (test_c17_mcp_stdio.py). ADR-002 updated to reconciled weights. mcp-reference.md regenerated.
 - **Verification:** ruff check src tests: All checks passed. pytest -q: 235 passed, 0 failed in 35.66s. No live API calls (FOCUSLIST_PROVIDER=fixture). Commit a179a7b on branch c17/channels-recommendations-engagement pushed to github.com:aangir14/YouTube_MCP_SE.git.
 - **Open evidence:** Teammate PR review pending. C19 will add explainable ranking UI pass.
+
+### Session C16–C17 Fixture CI Audit
+
+- **Date:** 2026-11-28 (IST). **Teammate / operator:** Harshil Srivastav. **AI tool:** Codex.
+- **Work:** Audited merged C16 and C17 at `d416ae3` against the course brief, SRS and commit plan. Repaired Actions environment setup and type-check failures. Recorded the fixture matrix and mocked quota overruns in [C16–C17 verification](../docs/testing/c16-c17-verification.md).
+- **Open evidence:** GitHub Actions must run the repaired revision. Quota, remaining acceptance coverage and formal teammate reviews are still open.
+
+### Session C18 Playlist Approval and Recovery
+
+- **Date:** 2026-11-28 (IST). **Teammate / operator:** Harshil Srivastav. **AI tool:** Codex.
+- **Work:** Added playlist ordering, signed review, one-time human approval, confirmed mutations and recovery in the C18 worktree from GitHub main at `d416ae3`.
+- **Verification:** Both Linux Python versions passed 282 offline tests, including synthetic metadata, exact approval, quota rejection and restart cases. [C18 evidence](../docs/testing/c18-playlist-approval-evidence.md)
+- **Open evidence:** The chosen AI client, hosted CI and both FR-7 teammate reviews remain pending.
