@@ -21,6 +21,7 @@ from focuslist.errors import (
     VideoUnavailableError,
 )
 from focuslist.platform.provider import VideoProvider
+from focuslist.platform.write_contracts import WriteAuthorizationContext
 from focuslist.types import AccountActivityRecord, ChannelRecord, VideoRecord
 
 NORMALIZED_FAULT_MAP: dict[str, Callable[[str | None], FocusListError]] = {
@@ -195,19 +196,39 @@ class FaultInjectionProvider(VideoProvider):
         title: str,
         description: str,
         privacy: str = "private",
+        *,
+        write_context: WriteAuthorizationContext | None = None,
     ) -> str:
         self._before_call("create_playlist", is_write=True)
-        return self.target.create_playlist(title, description, privacy=privacy)
+        return self.target.create_playlist(
+            title, description, privacy=privacy, write_context=write_context,
+        )
 
     def insert_playlist_item(
         self,
         playlist_id: str,
         video_id: str,
         position: int | None = None,
+        *,
+        write_context: WriteAuthorizationContext | None = None,
     ) -> str:
         self._before_call("insert_playlist_item", is_write=True)
-        return self.target.insert_playlist_item(playlist_id, video_id, position=position)
+        return self.target.insert_playlist_item(
+            playlist_id, video_id, position=position, write_context=write_context,
+        )
 
-    def delete_playlist(self, playlist_id: str) -> bool:
+    def delete_playlist(
+        self, playlist_id: str, *, write_context: WriteAuthorizationContext | None = None,
+    ) -> bool:
         self._before_call("delete_playlist", is_write=True)
-        return self.target.delete_playlist(playlist_id)
+        return self.target.delete_playlist(playlist_id, write_context=write_context)
+
+    def list_playlist_items_for_reconciliation(
+        self, playlist_id: str, max_results: int = 50,
+    ) -> list[str]:
+        self._before_call("list_playlist_items_for_reconciliation")
+        return self.target.list_playlist_items_for_reconciliation(playlist_id, max_results)
+
+    def find_created_playlist(self, title: str, description: str, privacy: str) -> str | None:
+        self._before_call("find_created_playlist")
+        return self.target.find_created_playlist(title, description, privacy)

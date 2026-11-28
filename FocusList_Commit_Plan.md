@@ -712,7 +712,7 @@ I am Ayush Patel, the owner of C17. Apply the Shared Antigravity instructions. R
 
 **Commit message** `feat(curation): secure playlist approval creation and recovery`
 
-- [ ] Pending · Actual date (IST) — · Evidence — <!-- C18-status -->
+- [ ] Implemented and verified offline · Actual date (IST) 2026-11-28 · Evidence: 282 tests passed on Linux Python 3.11 and 3.12, including 1,000 generated constraint cases, 15 synthetic hostile metadata cases, and real fixture MCP create, replay, restart, resume and undo. Approval and execution coverage were 93% and 91%. Ruff, mypy and fixture compliance passed with the CI repair. Hosted CI, the chosen AI client and both teammate FR-7 reviews remain pending. [Verification](docs/testing/c18-playlist-approval-evidence.md) <!-- C18-status -->
 
 Complete FR-5, FR-7 and FR-8 through the same stored-action flow, from ordering and proposal through approved creation, recovery and undo.
 

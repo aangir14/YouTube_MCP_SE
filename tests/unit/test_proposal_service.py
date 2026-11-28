@@ -8,8 +8,11 @@ from focuslist.clock import FakeClock
 from focuslist.config import Settings
 from focuslist.context import RequestContext
 from focuslist.curation import propose_playlist_action
+from focuslist.curation.approval import PlaylistApprovals
 from focuslist.errors import ErrorCode, QuotaBudgetExceededError
+from focuslist.platform.auth import AuthManager, MemoryCredentialStore
 from focuslist.platform.fixture_provider import FixtureVideoProvider
+from focuslist.platform.storage import FocusListStorage
 from focuslist.types import VideoRecord
 
 
@@ -40,7 +43,7 @@ def test_propose_playlist_action_valid_fixture_returns_reviewable_proposal(
         context=ctx,
     )
     res = resp["result"]
-    assert res["status"] == "PROPOSED"
+    assert res["status"] == "PREVIEW"
     assert res["privacy_status"] == "private"
     assert res["writes_executed"] == 0
     assert fixture_provider.writes == 0
@@ -48,7 +51,7 @@ def test_propose_playlist_action_valid_fixture_returns_reviewable_proposal(
     assert res["estimated_write_cost"] == 51 + (50 * res["item_count"])
     assert 2565 <= res["total_duration_seconds"] <= 2835
     assert all(item["untrusted"] is True for item in res["items"])
-    assert "C16_sqlite_persistence" in res["deferred_seams"]
+    assert res["confirmation_token"] is None
 
 
 def test_propose_playlist_action_infeasible_returns_nearest_achievable(
@@ -128,13 +131,18 @@ def test_propose_playlist_action_quota_and_signer_seams(
     assert hook_rejected["error"]["code"] == ErrorCode.QUOTA_BUDGET_EXCEEDED.value
     assert fixture_provider.requests == 0
 
+    store = FocusListStorage(ctx_ok.settings.db_path, clock=ctx_ok.clock)
+    auth = AuthManager(settings=ctx_ok.settings, storage=store, credential_store=MemoryCredentialStore())
+    approvals = PlaylistApprovals(store, auth, ctx_ok)
     signed = propose_playlist_action(
         {"topic": "recursion", "target_duration": "PT45M", "max_item_duration": "PT20M"},
         provider=fixture_provider,
-        context=_make_context(),
-        signer=lambda payload: f"signed:{payload['proposal_id']}",
+        context=ctx_ok,
+        approvals=approvals,
     )
-    assert signed["result"]["confirmation_token"].startswith("signed:prop_")
+    review = signed["result"]
+    verified = approvals.load(review["proposal_id"], token=review["confirmation_token"])
+    assert verified.action.review["items"] == review["items"]
 
 
 def test_propose_playlist_action_hydrates_and_filters_duplicates_and_unknown_lang() -> None:
@@ -184,7 +192,7 @@ def test_propose_playlist_action_hydrates_and_filters_duplicates_and_unknown_lan
         provider=provider,
         context=_make_context(),
     )
-    assert permissive_resp["result"]["status"] == "PROPOSED"
+    assert permissive_resp["result"]["status"] == "PREVIEW"
     assert permissive_resp["result"]["items"][0]["unknown_language_flagged"] is True
     assert permissive_resp["result"]["warnings"]
     assert provider.writes == 0

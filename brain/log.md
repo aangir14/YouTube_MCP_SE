@@ -244,3 +244,10 @@ This append-only log tracks additions, modifications, decision milestones, and s
 - **Date:** 2026-11-28 (IST). **Teammate / operator:** Harshil Srivastav. **AI tool:** Codex.
 - **Work:** Audited merged C16 and C17 at `d416ae3` against the course brief, SRS and commit plan. Repaired Actions environment setup and type-check failures. Recorded the fixture matrix and mocked quota overruns in [C16–C17 verification](../docs/testing/c16-c17-verification.md).
 - **Open evidence:** GitHub Actions must run the repaired revision. Quota, remaining acceptance coverage and formal teammate reviews are still open.
+
+### Session C18 Playlist Approval and Recovery
+
+- **Date:** 2026-11-28 (IST). **Teammate / operator:** Harshil Srivastav. **AI tool:** Codex.
+- **Work:** Added playlist ordering, signed review, one-time human approval, confirmed mutations and recovery in the C18 worktree from GitHub main at `d416ae3`.
+- **Verification:** Both Linux Python versions passed 282 offline tests, including synthetic metadata, exact approval, quota rejection and restart cases. [C18 evidence](../docs/testing/c18-playlist-approval-evidence.md)
+- **Open evidence:** The chosen AI client, hosted CI and both FR-7 teammate reviews remain pending.

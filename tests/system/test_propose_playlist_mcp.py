@@ -21,7 +21,7 @@ async def test_mcp_propose_playlist_valid_infeasible_and_invalid_zero_writes(
             "video_id": f"c15_vid_{i:02d}",
             "canonical_url": f"https://www.youtube.com/watch?v=c15_vid_{i:02d}",
             "title": f"Recursion Lecture {i}",
-            "channel_id": "UC_c15_chan_0000000001",
+            "channel_id": f"UC_c15_chan_{(i - 1) // 3:010d}",
             "channel_title": "C15 Academy",
             "description": "Detailed recursion lesson with examples.",
             "published_at": "2026-05-01T10:00:00Z",

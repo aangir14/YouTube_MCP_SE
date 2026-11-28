@@ -27,6 +27,16 @@ class WriteAuthorizationContext:
     approved_video_ids: tuple[str, ...] = ()
     target_playlist_id: str | None = None
     verified_by: str = "c18_confirmation_gate"
+    start_position: int = 0
+    credential_fingerprint: bytes | None = field(default=None, repr=False)
+
+    def permits_insertion(self, playlist_id: str, video_id: str, position: int | None) -> bool:
+        if self.target_playlist_id is not None and self.target_playlist_id != playlist_id:
+            return False
+        if position is None:
+            return False
+        offset = position - self.start_position
+        return 0 <= offset < len(self.approved_video_ids) and self.approved_video_ids[offset] == video_id
 
     def __post_init__(self) -> None:
         if not self.proposal_id or not self.account_id:
