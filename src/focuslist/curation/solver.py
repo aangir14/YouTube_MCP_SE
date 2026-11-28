@@ -447,14 +447,14 @@ def solve_playlist(
                     new_states.append((nxt_dur, nxt_count, nxt_score, nxt_indices))
 
         for nxt_dur, nxt_count, nxt_score, nxt_indices in new_states:
-            bucket = dp.get(nxt_dur)
-            if bucket is None:
+            next_bucket = dp.get(nxt_dur)
+            if next_bucket is None:
                 dp[nxt_dur] = [(nxt_count, nxt_score, nxt_indices)]
                 continue
             # Check dominance
             dominated = False
             filtered_bucket: list[tuple[int, float, tuple[int, ...]]] = []
-            for b_cnt, b_scr, b_idx in bucket:
+            for b_cnt, b_scr, b_idx in next_bucket:
                 if b_cnt <= nxt_count and round(b_scr, 6) >= round(nxt_score, 6):
                     if b_cnt < nxt_count or round(b_scr, 6) > round(nxt_score, 6):
                         dominated = True

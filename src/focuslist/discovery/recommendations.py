@@ -211,13 +211,13 @@ class RecommendationService:
             sub_channels: dict[str, ChannelRecord] = {}
             for offset in range(0, len(sub_channel_ids), _BATCH_SIZE):
                 batch = sub_channel_ids[offset : offset + _BATCH_SIZE]
-                for rec in read_with_accounting(
+                for channel in read_with_accounting(
                     self.ctx,
                     self.provider,
                     partial(self.provider.get_channels_details, batch),
                 ):
-                    norm = normalise_channel_record(rec)
-                    sub_channels[norm.channel_id] = norm
+                    normalised_channel = normalise_channel_record(channel)
+                    sub_channels[normalised_channel.channel_id] = normalised_channel
 
             # Build profile documents (namespaced by type)
             profile_docs: dict[str, tuple[str, str | None]] = {}

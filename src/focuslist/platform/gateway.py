@@ -8,7 +8,7 @@ import time
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Any, TypeVar
+from typing import Any, Literal, TypeVar
 
 from focuslist.clock import Clock, SystemClock
 from focuslist.config import Settings, get_settings
@@ -212,12 +212,10 @@ class ProviderGateway(VideoProvider):
                         scope=scope,
                         reservation=reservation,
                     )
-                    if isinstance(exc, QuotaExhaustedError):
-                        bucket = "search" if req_s > 0 and req_u == 0 else "general"
-                        self.quota_manager.mark_exhausted(bucket)
-                        raise
-                    if isinstance(exc, RateLimitedError):
-                        bucket = "search" if req_s > 0 and req_u == 0 else "general"
+                    if isinstance(exc, (QuotaExhaustedError, RateLimitedError)):
+                        bucket: Literal["search", "general"] = (
+                            "search" if req_s > 0 and req_u == 0 else "general"
+                        )
                         self.quota_manager.mark_exhausted(bucket)
                         raise
 
