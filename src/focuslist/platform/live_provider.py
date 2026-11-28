@@ -7,13 +7,14 @@ import json
 from collections import defaultdict
 from collections.abc import Callable
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from focuslist.config import Settings, get_settings
 from focuslist.errors import (
     AuthExpiredError,
     AuthRequiredError,
     ChannelUnavailableError,
+    ErrorCode,
     FocusListError,
     InvalidArgumentsError,
     NetworkTimeoutError,
@@ -42,6 +43,9 @@ from focuslist.platform.write_contracts import (
 from focuslist.types import (
     AccountActivityRecord,
     ChannelRecord,
+    PlaylistEntry,
+    PlaylistInfo,
+    PlaylistPage,
     VideoRecord,
     sanitize_untrusted_text,
 )
@@ -199,6 +203,7 @@ class LiveVideoProvider(VideoProvider):
         request_obj: Any,
         *,
         is_channel: bool = False,
+        is_playlist: bool = False,
     ) -> dict[str, Any]:
         """Execute a single Google API request, recording attempt and mapping errors safely."""
         from googleapiclient.errors import HttpError
@@ -215,6 +220,10 @@ class LiveVideoProvider(VideoProvider):
             ) from exc
         except HttpError as exc:
             status, reason = _extract_http_error_info(exc)
+            if is_playlist and (
+                status == 404 or (status == 403 and reason == "playlistItemsNotAccessible")
+            ):
+                raise FocusListError(ErrorCode.PLAYLIST_UNAVAILABLE) from exc
             if status == 401:
                 raise AuthExpiredError(
                     "OAuth access token was rejected (HTTP 401). Re-authenticate."
@@ -717,6 +726,60 @@ class LiveVideoProvider(VideoProvider):
             if not page_token:
                 break
         return records
+
+    def get_playlist_info(self, playlist_id: str) -> PlaylistInfo:
+        self.call_counts["get_playlist_info"] += 1
+        self.requests += 1
+        service = self._ensure_service()
+        response = self._execute_request(
+            "playlists.list", service.playlists().list(part="contentDetails", id=playlist_id),
+            is_playlist=True,
+        )
+        for item in response.get("items", ()):
+            if isinstance(item, dict) and item.get("id") == playlist_id:
+                return PlaylistInfo(_safe_int((item.get("contentDetails") or {}).get("itemCount")))
+        raise FocusListError(ErrorCode.PLAYLIST_UNAVAILABLE)
+
+    def get_playlist_page(
+        self, playlist_id: str, page_token: str | None = None, *, page_size: int = 50,
+    ) -> PlaylistPage:
+        self.call_counts["get_playlist_page"] += 1
+        self.requests += 1
+        service = self._ensure_service()
+        limit = max(1, min(page_size, _MAX_BATCH_SIZE))
+        parameters: dict[str, Any] = {
+            "part": "snippet,contentDetails", "playlistId": playlist_id, "maxResults": limit,
+        }
+        if page_token:
+            parameters["pageToken"] = page_token
+        response = self._execute_request(
+            "playlistItems.list", service.playlistItems().list(**parameters), is_playlist=True,
+        )
+        rows = response.get("items")
+        if not isinstance(rows, list):
+            raise UpstreamFailureError("Missing playlist page data.")
+        entries = []
+        for row in rows[:limit]:
+            if not isinstance(row, dict):
+                entries.append(PlaylistEntry())
+                continue
+            snippet = row.get("snippet") or {}
+            content = row.get("contentDetails") or {}
+            video_id = content.get("videoId") or (snippet.get("resourceId") or {}).get("videoId")
+            title = str(snippet.get("title") or "").strip().casefold()
+            hint: Literal["private", "deleted"] | None = None
+            if title == "private video":
+                hint = "private"
+            elif title == "deleted video":
+                hint = "deleted"
+            entries.append(PlaylistEntry(
+                video_id=video_id if isinstance(video_id, str) and video_id else None,
+                availability_hint=hint,
+            ))
+        token = response.get("nextPageToken")
+        if token is not None and not isinstance(token, str):
+            raise UpstreamFailureError("Invalid playlist pagination metadata.")
+        return PlaylistPage(tuple(entries), token or None)
 
     def get_categories(self, region_code: str = "US") -> list[dict[str, Any]]:
         self.call_counts["get_categories"] += 1

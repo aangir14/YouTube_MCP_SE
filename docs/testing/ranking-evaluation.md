@@ -29,3 +29,25 @@ For arithmetic verification, a ranked label sequence `0, 1, 0, 1, 0` yields prec
 V1 is a narrow, single-course judgement set. It measures a reproducible sparse-metadata case, has shared channel and language values, and cannot establish which weights help when metadata is richer. Given the frozen fields, a tie-free v1 text ordering is expected to remain the same after weighting (the remaining nonzero factors are constant). Score rounding can affect narrow ties. Record that outcome honestly and use the synthetic factor checks separately. A richer approved public cohort would need its own frozen facts, labels and documentation before team decisions about general ranking quality.
 
 TBD-8 has a frozen seed and candidate proposal for review. Under TBD-4, revisit feature scales, weights and the 0.60 target only after recording paired evidence and any approved change in the ADR. Keep v1 weights and results available as the baseline. The candidate limits, authorization boundaries and write prohibition come from the SRS and remain in force regardless of evaluation results.
+
+## C19 results
+
+Both methods ranked all 19 candidates for each of the 20 seeds. The runner fitted one corpus per seed and shared it across both methods. The 380 pairs, binary judgements, manifest version `c08-mit6006-v1` and manifest SHA-256 `24a1f4a44aa8f37c37f3213c6090334b176c3e93fbda3c2150206aa47f0770fc` match the frozen C08 input. [Full paired output](ranking-evaluation-c19-results.json)
+
+| Method | Macro precision@5 | MRR | Adjacent score ties |
+| --- | ---: | ---: | ---: |
+| TF-IDF only | 0.5300 | 0.904166666667 | 281 |
+| Weighted FR-1 | 0.5300 | 0.904166666667 | 281 |
+| Weighted minus baseline | 0.0000 | 0.0000 | 0 |
+
+Weighted precision@5 was **0.0700 below** the provisional 0.60 target. The ranked ID order was the same across both methods for every seed. Language and channel are constant in this fixture. Tags, category, dates and runtime are unknown, which limits what this comparison can establish about non-text weights. The existing SRS weights remain the defaults and TBD-4 stays open. [Decision record](../adr/ADR-002-discovery-analytics-and-ranking-evaluation.md)
+
+Run from the repository root. The JSON is deterministic. The benchmark timing is printed separately.
+
+```bash
+python -m focuslist.discovery.evaluate_ranking \
+  --manifest docs/testing/ranking-evaluation-seeds.json \
+  --output docs/testing/ranking-evaluation-c19-results.json --benchmark
+```
+
+The runner records each candidate list, both full ranked lists, labels, per-seed metrics and differences. It also reverses each candidate list to check that the result remains stable. The optional benchmark runs the weighted ranker 20 times on a separate synthetic 150-candidate corpus.

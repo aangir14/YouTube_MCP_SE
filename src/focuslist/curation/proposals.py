@@ -210,7 +210,9 @@ def propose_playlist_action(
         return resp
 
     now = context.clock.now()
-    result: SolverResult = solve_playlist(candidates, constraints, now=now)
+    result: SolverResult = solve_playlist(
+        candidates, constraints, now=now, weights=context.settings.scoring_weights["propose_playlist"],
+    )
 
     if not result.feasible:
         resp = context.success(
@@ -259,6 +261,11 @@ def propose_playlist_action(
             "duration_iso": item.duration_iso,
             "score": item.score,
             "reason": item.reason,
+            "components": item.components,
+            "feature_trace": item.feature_trace,
+            "shared_terms": item.shared_terms,
+            "missing_fields": item.missing_fields,
+            "low_confidence": item.low_confidence,
             "untrusted": item.untrusted,
             "unknown_language_flagged": item.unknown_language_flagged,
         }

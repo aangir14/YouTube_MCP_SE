@@ -33,12 +33,11 @@ def test_skill_validator_passes_present_skills_and_rejects_bad_copy(tmp_path: Pa
     """Validate local-check & brain-refine skills; verify negative invalid-frontmatter copy fails."""
     summary = validate_all_skills(REPO_ROOT / "skills", repo_root=REPO_ROOT, require_all_six=False)
     assert summary["valid"] is True
-    assert set(summary["present_skills"]) == {"brain-refine", "local-check"}
+    assert set(summary["present_skills"]) == {"brain-refine", "local-check", "playlist-audit"}
     assert set(summary["pending_skills"]) == {
         "video-to-playlist",
         "brain-ingest",
         "brain-query",
-        "playlist-audit",
     }
 
     bad_skill = tmp_path / "skills" / "bad-skill"

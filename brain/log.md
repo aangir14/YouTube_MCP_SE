@@ -251,3 +251,10 @@ This append-only log tracks additions, modifications, decision milestones, and s
 - **Work:** Added playlist ordering, signed review, one-time human approval, confirmed mutations and recovery in the C18 worktree from GitHub main at `d416ae3`.
 - **Verification:** Both Linux Python versions passed 282 offline tests, including synthetic metadata, exact approval, quota rejection and restart cases. [C18 evidence](../docs/testing/c18-playlist-approval-evidence.md)
 - **Open evidence:** The chosen AI client, hosted CI and both FR-7 teammate reviews remain pending.
+
+### Session C19 Ranking Evidence and Playlist Audit
+
+- **Date:** 2026-11-29 (IST). **Teammate / operator:** Harshil Srivastav. **AI tool:** Codex.
+- **Work:** Shared FR-6 explanations and active weights, reproduced the frozen C08 comparison, and delivered bounded FR-12 analysis and SK-6 on published C18 revision `f5efe08`.
+- **Verification:** 296 tests passed on both Linux Python versions. Both rankers measured 0.53 precision@5 and 0.904166666667 MRR. The 501-position fixture stopped at 500 with 21 reads and zero writes. [C19 evidence](../docs/testing/c19-ranking-and-playlist-audit-evidence.md)
+- **Open evidence:** TBD-4 remains open after the 0.07 precision shortfall. Hosted ranking timing and teammate review are pending.

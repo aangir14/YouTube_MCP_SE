@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from typing import Any
+from unittest.mock import Mock
 
 import pytest
 from googleapiclient.errors import HttpError
@@ -15,6 +16,8 @@ from focuslist.errors import (
     AuthExpiredError,
     AuthRequiredError,
     ChannelUnavailableError,
+    ErrorCode,
+    FocusListError,
     NetworkTimeoutError,
     QuotaExhaustedError,
     RateLimitedError,
@@ -345,3 +348,53 @@ def test_live_provider_rejects_malformed_response_payload() -> None:
 
     with pytest.raises(UpstreamFailureError):
         provider.get_video_details(["vid_1234567"])
+
+
+def test_playlist_page_preserves_placeholders_and_next_page_signal() -> None:
+    service = Mock()
+    pid = "PL_c19_mock_playlist"
+    playlist = service.playlists.return_value.list
+    playlist.return_value.execute.return_value = {
+        "items": [{"id": pid, "contentDetails": {"itemCount": 51}}],
+    }
+    pages = service.playlistItems.return_value.list
+    pages.return_value.execute.return_value = {
+        "items": [
+            {"snippet": {"title": "Deleted video"}},
+            {"snippet": {"title": "Private video", "resourceId": {"videoId": "vid_1234567"}}},
+            {"contentDetails": {"videoId": "vid_2345678"}},
+        ],
+        "nextPageToken": "opaque-synthetic-page",
+    }
+    provider = LiveVideoProvider(service=service)
+    assert provider.get_playlist_info(pid).item_count == 51
+    page = provider.get_playlist_page(pid, "start-synthetic", page_size=50)
+    assert [(row.video_id, row.availability_hint) for row in page.entries] == [
+        (None, "deleted"), ("vid_1234567", "private"), ("vid_2345678", None),
+    ]
+    assert page.next_page_token == "opaque-synthetic-page"
+    playlist.assert_called_once_with(part="contentDetails", id=pid)
+    pages.assert_called_once_with(
+        part="snippet,contentDetails", playlistId=pid,
+        maxResults=50, pageToken="start-synthetic",
+    )
+    assert provider.network_attempts == 2 and provider.writes == 0
+
+
+def test_playlist_availability_keeps_quota_and_access_failures_distinct() -> None:
+    service = Mock()
+    provider = LiveVideoProvider(service=service)
+    pid = "PL_c19_inaccessible"
+    service.playlists.return_value.list.return_value.execute.return_value = {"items": []}
+    with pytest.raises(FocusListError) as absent:
+        provider.get_playlist_info(pid)
+    assert absent.value.code == ErrorCode.PLAYLIST_UNAVAILABLE
+    request = service.playlistItems.return_value.list.return_value
+    request.execute.side_effect = _http_error(403, "playlistItemsNotAccessible")
+    with pytest.raises(FocusListError) as inaccessible:
+        provider.get_playlist_page(pid)
+    assert inaccessible.value.code == ErrorCode.PLAYLIST_UNAVAILABLE
+    request.execute.side_effect = _http_error(403, "quotaExceeded")
+    with pytest.raises(QuotaExhaustedError):
+        provider.get_playlist_page(pid)
+    assert provider.network_attempts == 3 and provider.writes == 0

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import unicodedata
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Literal
 
@@ -111,6 +112,27 @@ class AccountActivityRecord(BaseModel):
     playlist_item_id: str | None = Field(
         default=None, description="Playlist item ID for deduplicating playlist memberships"
     )
+
+
+class PlaylistEntry(BaseModel):
+    """One playlist position, including an unavailable row with no video ID."""
+
+    model_config = ConfigDict(frozen=True)
+    video_id: str | None = None
+    availability_hint: Literal["private", "deleted"] | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class PlaylistInfo:
+    """Readability was verified even when the upstream count is unknown."""
+
+    item_count: int | None
+
+
+@dataclass(frozen=True, slots=True)
+class PlaylistPage:
+    entries: tuple[PlaylistEntry, ...]
+    next_page_token: str | None = None
 
 
 class RankedItemRecord(BaseModel):

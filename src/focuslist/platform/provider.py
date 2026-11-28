@@ -6,7 +6,13 @@ from abc import ABC, abstractmethod
 from typing import Any
 
 from focuslist.platform.write_contracts import WriteAuthorizationContext
-from focuslist.types import AccountActivityRecord, ChannelRecord, VideoRecord
+from focuslist.types import (
+    AccountActivityRecord,
+    ChannelRecord,
+    PlaylistInfo,
+    PlaylistPage,
+    VideoRecord,
+)
 
 
 class VideoProvider(ABC):
@@ -102,6 +108,16 @@ class VideoProvider(ABC):
     def get_categories(self, region_code: str = "US") -> list[dict[str, Any]]:
         """Fetch available video categories for region (costs 1 unit, cached 7 days)."""
         ...
+
+    def get_playlist_info(self, playlist_id: str) -> PlaylistInfo:
+        """Verify readability and get the item count in one playlist lookup."""
+        raise NotImplementedError
+
+    def get_playlist_page(
+        self, playlist_id: str, page_token: str | None = None, *, page_size: int = 50,
+    ) -> PlaylistPage:
+        """Read one page of positions, including unavailable placeholders."""
+        raise NotImplementedError
 
     @abstractmethod
     def check_channel_eligibility(self, account_id: str) -> bool:

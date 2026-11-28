@@ -7,13 +7,16 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
-from focuslist.errors import InvalidArgumentsError
+from focuslist.errors import ErrorCode, FocusListError, InvalidArgumentsError
 from focuslist.metadata import normalise_channel_record, normalise_video_record
 from focuslist.platform.provider import VideoProvider
 from focuslist.platform.write_contracts import WriteAuthorizationContext
 from focuslist.types import (
     AccountActivityRecord,
     ChannelRecord,
+    PlaylistEntry,
+    PlaylistInfo,
+    PlaylistPage,
     VideoRecord,
 )
 
@@ -40,6 +43,7 @@ class FixtureVideoProvider(VideoProvider):
         self._subscriptions: list[AccountActivityRecord] | None = None
         self._playlists: list[dict[str, Any]] | None = None
         self._playlist_items: dict[str, list[AccountActivityRecord]] = {}
+        self._audit_entries: dict[str, tuple[PlaylistEntry, ...]] = {}
         self._load_fixtures()
 
     def reset_counters(self) -> None:
@@ -75,6 +79,14 @@ class FixtureVideoProvider(VideoProvider):
 
     def _load_fixtures(self) -> None:
         """Load synthetic fixtures from JSON files if present."""
+        audit_file = self.fixture_dir / "sample_playlist_audit.json"
+        if audit_file.is_file():
+            snapshots = json.loads(audit_file.read_text(encoding="utf-8"))
+            self._audit_entries = {
+                pid: tuple(PlaylistEntry.model_validate(row) for row in entries)
+                for pid, entries in snapshots.items()
+            }
+
         videos_file = self.fixture_dir / "sample_videos.json"
         if videos_file.exists():
             with open(videos_file, "r", encoding="utf-8") as f:
@@ -315,6 +327,33 @@ class FixtureVideoProvider(VideoProvider):
             {"id": "27", "title": "Education"},
             {"id": "28", "title": "Science & Technology"},
         ]
+
+    def _read_playlist(self, playlist_id: str) -> tuple[PlaylistEntry, ...]:
+        if playlist_id in self._audit_entries:
+            return self._audit_entries[playlist_id]
+        if playlist_id in self._created_playlists:
+            return tuple(
+                PlaylistEntry(video_id=vid) for vid in self._created_playlists[playlist_id]["items"]
+            )
+        if playlist_id in self._playlist_items:
+            return tuple(PlaylistEntry(video_id=row.item_id) for row in self._playlist_items[playlist_id])
+        if any(row["playlist_id"] == playlist_id and not row.get("item_count")
+               for row in self._playlists or ()):
+            return ()
+        raise FocusListError(ErrorCode.PLAYLIST_UNAVAILABLE)
+
+    def get_playlist_info(self, playlist_id: str) -> PlaylistInfo:
+        self._record_call("get_playlist_info", playlist_id=playlist_id)
+        return PlaylistInfo(len(self._read_playlist(playlist_id)))
+
+    def get_playlist_page(
+        self, playlist_id: str, page_token: str | None = None, *, page_size: int = 50,
+    ) -> PlaylistPage:
+        self._record_call("get_playlist_page", playlist_id=playlist_id, page_size=page_size)
+        entries = self._read_playlist(playlist_id)
+        start = int(page_token) if page_token else 0
+        end = min(start + min(page_size, 50), len(entries))
+        return PlaylistPage(entries[start:end], str(end) if end < len(entries) else None)
 
     def check_channel_eligibility(self, account_id: str) -> bool:
         self._record_call("check_channel_eligibility", account_id=account_id)

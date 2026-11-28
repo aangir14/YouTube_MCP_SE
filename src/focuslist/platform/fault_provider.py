@@ -22,7 +22,13 @@ from focuslist.errors import (
 )
 from focuslist.platform.provider import VideoProvider
 from focuslist.platform.write_contracts import WriteAuthorizationContext
-from focuslist.types import AccountActivityRecord, ChannelRecord, VideoRecord
+from focuslist.types import (
+    AccountActivityRecord,
+    ChannelRecord,
+    PlaylistInfo,
+    PlaylistPage,
+    VideoRecord,
+)
 
 NORMALIZED_FAULT_MAP: dict[str, Callable[[str | None], FocusListError]] = {
     "quota": QuotaExhaustedError,
@@ -186,6 +192,16 @@ class FaultInjectionProvider(VideoProvider):
     def get_categories(self, region_code: str = "US") -> list[dict[str, Any]]:
         self._before_call("get_categories")
         return self.target.get_categories(region_code=region_code)
+
+    def get_playlist_info(self, playlist_id: str) -> PlaylistInfo:
+        self._before_call("get_playlist_info")
+        return self.target.get_playlist_info(playlist_id)
+
+    def get_playlist_page(
+        self, playlist_id: str, page_token: str | None = None, *, page_size: int = 50,
+    ) -> PlaylistPage:
+        self._before_call("get_playlist_page")
+        return self.target.get_playlist_page(playlist_id, page_token, page_size=page_size)
 
     def check_channel_eligibility(self, account_id: str) -> bool:
         self._before_call("check_channel_eligibility")

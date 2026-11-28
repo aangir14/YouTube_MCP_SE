@@ -8,6 +8,8 @@ from collections import Counter
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from typing import Any, TypeVar
 
+from typing_extensions import TypedDict
+
 from focuslist.context import RequestContext
 from focuslist.errors import AuthRequiredError, FocusListError, QuotaBudgetExceededError
 from focuslist.metadata import primary_language
@@ -144,6 +146,38 @@ def format_reason(
     if len(full) <= max_length:
         return full
     return full[: max_length - 3].rstrip() + "..."
+
+
+class ScoreExplanation(TypedDict):
+    score: float
+    components: dict[str, float]
+    feature_trace: dict[str, dict[str, float]]
+    shared_terms: list[str]
+    missing_fields: list[str]
+    low_confidence: bool
+    reason: str
+
+
+def explain_score(
+    raw: Mapping[str, float],
+    weights: Mapping[str, float],
+    *,
+    shared_terms: Sequence[str] = (),
+    missing_fields: Sequence[str] = (),
+    low_confidence: bool = False,
+) -> ScoreExplanation:
+    """Build the common FR-6 response without calling a provider."""
+    trace, score = build_feature_trace(raw, weights)
+    missing = sorted(set(missing_fields))
+    return {
+        "score": score,
+        "components": dict(weights),
+        "feature_trace": trace,
+        "shared_terms": list(dict.fromkeys(shared_terms))[:5],
+        "missing_fields": missing,
+        "low_confidence": low_confidence,
+        "reason": format_reason(trace),
+    }
 
 
 def resolve_authorized_account(

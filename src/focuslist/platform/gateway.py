@@ -26,7 +26,13 @@ from focuslist.platform.provider import VideoProvider
 from focuslist.platform.quota import METHOD_COSTS, QuotaManager, QuotaReservation
 from focuslist.platform.storage import FocusListStorage
 from focuslist.platform.write_contracts import AmbiguousWriteError
-from focuslist.types import AccountActivityRecord, ChannelRecord, VideoRecord
+from focuslist.types import (
+    AccountActivityRecord,
+    ChannelRecord,
+    PlaylistInfo,
+    PlaylistPage,
+    VideoRecord,
+)
 
 _T = TypeVar("_T")
 
@@ -546,6 +552,29 @@ class ProviderGateway(VideoProvider):
             lambda: self.provider.get_playlist_items(playlist_id, max_results=cap),
             expected_units=pages,
             expected_searches=0,
+        )
+
+    def get_playlist_info(self, playlist_id: str) -> PlaylistInfo:
+        return self._execute_with_accounting(
+            "get_playlist_info", lambda: self.provider.get_playlist_info(playlist_id),
+            allow_retry=False,
+        )
+
+    def get_playlist_page(
+        self, playlist_id: str, page_token: str | None = None, *, page_size: int = 50,
+    ) -> PlaylistPage:
+        return self._execute_with_accounting(
+            "get_playlist_page",
+            lambda: self.provider.get_playlist_page(playlist_id, page_token, page_size=page_size),
+            allow_retry=False,
+        )
+
+    def get_playlist_video_details(self, video_ids: list[str]) -> list[VideoRecord]:
+        """Hydrate one batch without putting account-sensitive data in the shared video cache."""
+        if not 1 <= len(video_ids) <= _MAX_BATCH_SIZE:
+            raise ValueError("Playlist detail lookups require a single nonempty batch.")
+        return self._execute_with_accounting(
+            "get_video_details", lambda: self.provider.get_video_details(video_ids), allow_retry=False,
         )
 
     def get_categories(self, region_code: str = "US") -> list[dict[str, Any]]:

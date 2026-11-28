@@ -789,7 +789,7 @@ I am Harshil Srivastav, the owner of C18. Apply the Shared Antigravity instructi
 
 **Commit message** `feat(analysis): explain rankings and deliver playlist audit`
 
-- [ ] Pending · Actual date (IST) — · Evidence — <!-- C19-status -->
+- [ ] Implemented and verified offline · Actual date (IST) 2026-11-29 · Evidence: Both rankers used 20 frozen C08 seeds and returned precision@5 0.53 and MRR 0.904166666667. Weighted precision missed the provisional target by 0.07, with defaults retained under TBD-4. Both FR-12 tools capped the 501-position fixture at 500 with 21 reads and zero writes. All three SKE-SK6 cases passed, including zero-call quota denial. Ruff, mypy, compliance and 296 tests passed on Linux Python 3.11 and 3.12. Hosted benchmark and teammate review are pending. [Verification](docs/testing/c19-ranking-and-playlist-audit-evidence.md) <!-- C19-status -->
 
 Finish FR-6 score explanations and measured ranking comparison. Deliver FR-12 analysis and SK-6 with bounded provider reads.
 

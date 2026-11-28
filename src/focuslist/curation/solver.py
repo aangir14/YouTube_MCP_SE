@@ -6,6 +6,7 @@ import math
 import re
 import unicodedata
 from collections import Counter
+from collections.abc import Mapping
 from datetime import UTC, datetime
 from typing import Any
 
@@ -18,21 +19,15 @@ from focuslist.curation.ordering import (
     order_candidates,
     pack_sessions,
 )
+from focuslist.discovery.scoring import ScoreExplanation, cosine_and_shared_terms, explain_score
 from focuslist.metadata import (
     format_duration_iso,
     normalise_video_record,
+    primary_language,
     same_primary_language,
 )
+from focuslist.ranking_weights import FR5_WEIGHTS
 from focuslist.types import VideoRecord, format_duration_display
-
-# FR-5 SRS weights: topic_match, caption_availability, freshness, capped_quality, known_language
-FR5_WEIGHTS: dict[str, float] = {
-    "topic_match": 0.65,
-    "caption_availability": 0.10,
-    "freshness": 0.10,
-    "capped_quality": 0.10,
-    "known_language": 0.05,
-}
 
 _TOKEN_RE = re.compile(r"[0-9A-Za-z\u00C0-\u024F\u0370-\u1FFF\u2C00-\uD7AF]+")
 _FIVE_YEARS_DAYS = 1825.0
@@ -44,11 +39,9 @@ def _tokenize(text: str) -> list[str]:
     return _TOKEN_RE.findall(normalized)
 
 
-def _compute_tfidf_cosines(query: str, documents: list[str]) -> list[float]:
-    """Compute L2-normalized TF-IDF cosine similarity of query against each document."""
+def _compute_tfidf_matches(query: str, documents: list[str]) -> list[tuple[float, list[str], bool]]:
+    """Keep C15 query scoring and expose the most influential shared terms."""
     q_tokens = _tokenize(query)
-    if not q_tokens or not documents:
-        return [0.0] * len(documents)
 
     doc_tokens_list = [_tokenize(doc) for doc in documents]
     n_docs = len(doc_tokens_list) + 1  # Include query in corpus document frequency
@@ -71,17 +64,12 @@ def _compute_tfidf_cosines(query: str, documents: list[str]) -> list[float]:
         return {term: val / norm for term, val in vec.items()}
 
     q_vec = _tfidf_vec(q_tokens)
-    if not q_vec:
-        return [0.0] * len(documents)
-
-    scores: list[float] = []
+    scores: list[tuple[float, list[str], bool]] = []
     for toks in doc_tokens_list:
         d_vec = _tfidf_vec(toks)
-        if not d_vec:
-            scores.append(0.0)
-            continue
         dot = sum(q_vec[t] * d_vec[t] for t in q_vec if t in d_vec)
-        scores.append(min(1.0, max(0.0, dot)))
+        _, shared = cosine_and_shared_terms(q_vec, d_vec)
+        scores.append((min(1.0, max(0.0, dot)), shared, bool(d_vec)))
     return scores
 
 
@@ -95,6 +83,7 @@ class ScoredCandidate(BaseModel):
     components: dict[str, float] = Field(default_factory=dict)
     reason: str = Field(default="Matches topic and duration constraints.")
     unknown_language_flagged: bool = False
+    explanation: ScoreExplanation | None = None
 
 
 class SelectedPlaylistItem(BaseModel):
@@ -114,6 +103,11 @@ class SelectedPlaylistItem(BaseModel):
     reason: str
     untrusted: bool = True
     unknown_language_flagged: bool = False
+    components: dict[str, float] = Field(default_factory=dict)
+    feature_trace: dict[str, dict[str, float]] = Field(default_factory=dict)
+    shared_terms: list[str] = Field(default_factory=list)
+    missing_fields: list[str] = Field(default_factory=list)
+    low_confidence: bool = False
 
 
 class ConstraintViolation(BaseModel):
@@ -207,6 +201,7 @@ def score_candidates_fr5(
     eligible: list[tuple[VideoRecord, bool]],
     constraints: ValidatedPlaylistConstraints,
     now: datetime,
+    *, weights: Mapping[str, float] = FR5_WEIGHTS,
 ) -> list[ScoredCandidate]:
     """Compute deterministic FR-5 scores (0.65/0.10/0.10/0.10/0.05) with zero engagement inputs."""
     if not eligible:
@@ -225,10 +220,10 @@ def score_candidates_fr5(
         )
         for v, _ in eligible
     ]
-    topic_cosines = _compute_tfidf_cosines(constraints.topic, docs)
+    matches = _compute_tfidf_matches(constraints.topic, docs)
 
     scored: list[ScoredCandidate] = []
-    for (video, unknown_lang), topic_sim in zip(eligible, topic_cosines, strict=True):
+    for (video, unknown_lang), (topic_sim, shared, has_text) in zip(eligible, matches, strict=True):
         captions = 1.0 if video.has_captions is True else 0.0
 
         if video.published_at is not None:
@@ -250,32 +245,34 @@ def score_candidates_fr5(
 
         known_lang = 1.0 if not unknown_lang else 0.0
 
-        total = (
-            FR5_WEIGHTS["topic_match"] * topic_sim
-            + FR5_WEIGHTS["caption_availability"] * captions
-            + FR5_WEIGHTS["freshness"] * freshness
-            + FR5_WEIGHTS["capped_quality"] * capped_quality
-            + FR5_WEIGHTS["known_language"] * known_lang
-        )
+        features = {
+            "topic_match": topic_sim,
+            "caption_availability": captions,
+            "freshness": freshness,
+            "capped_quality": capped_quality,
+            "known_language": known_lang,
+        }
+        total = sum(features[name] * weights[name] for name in FR5_WEIGHTS)
         total_rounded = round(min(1.0, max(0.0, total)), 6)
-
-        reason = (
-            f"Topic match {topic_sim:.2f}, captions={'yes' if captions else 'no'}, "
-            f"quality={capped_quality:.2f}."
-        )[:200]
+        facts_missing = {
+            "text": not has_text, "language": unknown_lang or not video.language,
+            "has_captions": video.has_captions is None, "published_at": video.published_at is None,
+            "description": video.description is None, "tags": video.tags is None,
+            "category_id": not video.category_id,
+        }
+        explanation = explain_score(
+            features, weights, shared_terms=shared,
+            missing_fields=[name for name, missing in facts_missing.items() if missing],
+            low_confidence=not has_text or primary_language(video.language) != "en",
+        )
 
         scored.append(
             ScoredCandidate(
                 video=video,
                 score=total_rounded,
-                components={
-                    "topic_match": round(topic_sim, 6),
-                    "caption_availability": captions,
-                    "freshness": round(freshness, 6),
-                    "capped_quality": round(capped_quality, 6),
-                    "known_language": known_lang,
-                },
-                reason=reason,
+                components={name: round(value, 6) for name, value in features.items()},
+                reason=explanation["reason"],
+                explanation=explanation,
                 unknown_language_flagged=unknown_lang,
             )
         )
@@ -330,6 +327,7 @@ def _to_selected_items(
     items: list[SelectedPlaylistItem] = []
     for idx, cand in enumerate(chosen, start=1):
         dur = cand.video.duration_seconds or 0
+        explanation = cand.explanation
         items.append(
             SelectedPlaylistItem(
                 order=idx,
@@ -344,6 +342,11 @@ def _to_selected_items(
                 reason=cand.reason,
                 untrusted=True,
                 unknown_language_flagged=cand.unknown_language_flagged,
+                components=explanation["components"] if explanation else {},
+                feature_trace=explanation["feature_trace"] if explanation else {},
+                shared_terms=explanation["shared_terms"] if explanation else [],
+                missing_fields=explanation["missing_fields"] if explanation else [],
+                low_confidence=explanation["low_confidence"] if explanation else False,
             )
         )
     return items
@@ -355,6 +358,7 @@ def solve_playlist(
     *,
     now: datetime | None = None,
     pre_scored: dict[str, float] | None = None,
+    weights: Mapping[str, float] = FR5_WEIGHTS,
 ) -> SolverResult:
     """Pure deterministic bounded duration solver over hard-filtered candidates.
 
@@ -374,7 +378,7 @@ def solve_playlist(
             for video, unknown_lang in eligible
         ]
     else:
-        scored = score_candidates_fr5(eligible, constraints, ref_now)
+        scored = score_candidates_fr5(eligible, constraints, ref_now, weights=weights)
 
     scored, diversity_drops = diversify_candidates(scored)
     dropped.update(diversity_drops)

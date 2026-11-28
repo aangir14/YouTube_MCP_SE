@@ -22,7 +22,9 @@ from focuslist.curation.approval import PlaylistApprovals
 from focuslist.curation.execution import PlaylistExecution
 from focuslist.discovery.channels import ChannelDiscovery
 from focuslist.discovery.engagement import EngagementService
+from focuslist.discovery.playlists import PlaylistAnalysis
 from focuslist.discovery.recommendations import RecommendationService
+from focuslist.discovery.scoring import run_tool_with_envelope
 from focuslist.discovery.videos import VideoDiscovery
 from focuslist.errors import (
     ConfirmationInvalidError,
@@ -36,8 +38,9 @@ from focuslist.platform import create_provider
 from focuslist.platform.auth import AuthManager, SecretRedactingFilter
 from focuslist.platform.gateway import ProviderGateway
 from focuslist.platform.provider import VideoProvider
-from focuslist.platform.quota import QuotaManager, estimate_operation_cost
+from focuslist.platform.quota import PLAYLIST_SCAN_LIMIT, QuotaManager, estimate_operation_cost
 from focuslist.platform.storage import FocusListStorage
+from focuslist.skills.playlist_audit import SKILL_INSTRUCTIONS
 
 # Stdio Hygiene: ensure diagnostics and internal logs route exclusively to stderr
 logging.basicConfig(
@@ -295,49 +298,33 @@ def create_server(
         name="analyse_playlist",
         description="Summarize a public or user playlist's duration distribution and topics.",
     )
-    def analyse_playlist(playlist_url_or_id: str) -> dict[str, Any]:
-        """Analyze playlist duration metrics, channel shares, and categories."""
-        try:
-            playlist_id = parse_playlist_id(playlist_url_or_id)
-        except FocusListError as exc:
-            return ctx.failure(exc).model_dump()
-
-        ctx.record_quota_charge(3)
-        return ctx.success(
-            {
-                "playlist_id": playlist_id,
-                "total_items": 5,
-                "total_duration": "1:16:00",
-                "languages": ["en"],
-                "top_channels": [{"channel": "Synthetic Tech Academy", "count": 3, "share": 0.60}],
-                "top_categories": [{"category": "Science & Technology", "count": 5, "share": 1.00}],
-            }
-        ).model_dump()
+    def analyse_playlist(
+        playlist_url_or_id: str, item_limit: StrictInt = PLAYLIST_SCAN_LIMIT,
+    ) -> dict[str, Any]:
+        """Analyze actual playlist positions and report known runtime and metadata counts."""
+        request = curation_context()
+        analysis = PlaylistAnalysis(provider, request)
+        return run_tool_with_envelope(
+            request, provider, lambda: analysis.analyse(playlist_url_or_id, item_limit),
+        )
 
     @mcp.tool(
         name="audit_playlist",
-        description="Audit a playlist for unavailable, duplicate, overlong, or stale videos.",
+        description="Audit a playlist for unavailable, duplicate, overlong, stale, live or upcoming items.",
     )
     def audit_playlist(
-        playlist_url_or_id: str, max_item_length_minutes: int | None = None
+        playlist_url_or_id: str, max_item_length_minutes: StrictInt | None = None,
+        stale_after_years: StrictInt = 5, item_limit: StrictInt = PLAYLIST_SCAN_LIMIT,
     ) -> dict[str, Any]:
-        """Audit playlist health and identify flagged items."""
-        try:
-            playlist_id = parse_playlist_id(playlist_url_or_id)
-        except FocusListError as exc:
-            return ctx.failure(exc).model_dump()
-
-        ctx.record_quota_charge(3)
-        return ctx.success(
-            {
-                "playlist_id": playlist_id,
-                "total_items_scanned": 5,
-                "flagged_count": 0,
-                "issues": [],
-                "health_score": 1.0,
-                "recommendation": "Playlist is clean. No unavailable, duplicate, or stale items detected.",
-            }
-        ).model_dump()
+        """Return read-only evidence about flagged positions and applied thresholds."""
+        request = curation_context()
+        audit = PlaylistAnalysis(provider, request)
+        return run_tool_with_envelope(
+            request, provider, lambda: audit.audit(
+                playlist_url_or_id, item_limit=item_limit,
+                max_item_length_minutes=max_item_length_minutes, stale_after_years=stale_after_years,
+            ),
+        )
 
     # ==========================================================================
     # Operational & Quota Status Tools (SRS FR-10, UI-2)
@@ -406,18 +393,15 @@ def create_server(
         """Read the exact local proposal for review without exposing its signature."""
         return json.dumps(approvals.load(proposal_id).action.review, ensure_ascii=True, indent=2)
 
-    @mcp.resource("focuslist://config/scoring")
+    @mcp.resource("focuslist://config/scoring", mime_type="application/json")
     def get_scoring_weights() -> str:
-        """Active scoring component weights configuration."""
-        return (
-            "# FocusList Default Component Weights\n\n"
-            "similar_videos = [0.50, 0.15, 0.10, 0.10, 0.10, 0.05]\n"
-            "# TF-IDF cosine, tag overlap, category, duration, language, channel\n\n"
-            "similar_channels = [0.60, 0.20, 0.10, 0.10]\n"
-            "# Text cosine, topic taxonomy, language, channel size\n\n"
-            "recommend_videos = [0.60, 0.15, 0.15, 0.10]\n"
-            "# History similarity, freshness, duration fit, channel affinity\n"
-        )
+        """Return the active named weights for FR-1, FR-2, FR-3 and FR-5."""
+        return json.dumps(cfg.scoring_weights, sort_keys=True, indent=2)
+
+    @mcp.resource("focuslist://skills/playlist-audit")
+    def get_playlist_audit_skill() -> str:
+        """Return the SK-6 read-only audit instructions."""
+        return SKILL_INSTRUCTIONS
 
     @mcp.resource("focuslist://quota/status")
     def get_quota_resource() -> str:
@@ -449,9 +433,6 @@ def create_server(
     @mcp.prompt("playlist-audit")
     def prompt_playlist_audit(playlist_id: str) -> str:
         """Prompt template for playlist audit and health inspection."""
-        return (
-            f"Audit the YouTube playlist '{playlist_id}' for unavailable items, duplicate titles, "
-            "overlong videos, and stale content. Provide a concise summary table of any issues found."
-        )
+        return f"Playlist ID {parse_playlist_id(playlist_id)}. {SKILL_INSTRUCTIONS}"
 
     return mcp

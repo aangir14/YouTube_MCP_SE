@@ -13,10 +13,9 @@ from typing import Any
 
 from focuslist.context import RequestContext
 from focuslist.discovery.scoring import (
-    build_feature_trace,
     build_tfidf_vectors,
     cosine_and_shared_terms,
-    format_reason,
+    explain_score,
     mean_normalized_vector,
     preflight_non_gateway,
     read_with_accounting,
@@ -34,6 +33,7 @@ from focuslist.platform.auth import AuthManager
 from focuslist.platform.gateway import ProviderGateway
 from focuslist.platform.provider import VideoProvider
 from focuslist.platform.storage import FocusListStorage
+from focuslist.ranking_weights import RECOMMENDATION_WEIGHTS
 from focuslist.types import AccountActivityRecord, ChannelRecord, VideoRecord
 
 _VALID_SOURCES = frozenset({"likes", "subscriptions", "playlists"})
@@ -48,13 +48,8 @@ _BATCH_SIZE = 50
 _GENERAL_CAP = 40
 _EARLIEST = datetime.min.replace(tzinfo=UTC)
 
-# Reconciled to SRS FR-3 weights (0.60 / 0.15 / 0.15 / 0.10)
-RECOMMENDATION_WEIGHTS: dict[str, float] = {
-    "profile_similarity": 0.60,
-    "freshness": 0.15,
-    "duration_fit": 0.15,
-    "channel_affinity": 0.10,
-}
+__all__ = ["RECOMMENDATION_WEIGHTS", "WATCH_HISTORY_DISCLOSURE", "RecommendationService",
+           "validate_sources"]
 
 WATCH_HISTORY_DISCLOSURE = (
     "Watch history is unavailable and excluded; recommendations are derived from "
@@ -415,6 +410,13 @@ class RecommendationService:
             profile_mean_vec = mean_normalized_vector(
                 vec for key, vec in vectors.items() if not key.startswith("cand:")
             )
+            profile_languages = [primary_language(lang) for _, lang in profile_docs.values()]
+            profile_missing = []
+            if not profile_mean_vec:
+                profile_missing.append("profile.text")
+            if None in profile_languages:
+                profile_missing.append("profile.language")
+            profile_uses_fallback = any(lang != "en" for lang in profile_languages)
             now_utc = self.ctx.clock.now()
 
             ranked: list[tuple[dict[str, Any], datetime | None]] = []
@@ -460,7 +462,6 @@ class RecommendationService:
                     "duration_fit": duration_fit,
                     "channel_affinity": channel_affinity,
                 }
-                trace, score = build_feature_trace(raw, RECOMMENDATION_WEIGHTS)
 
                 # Up to 3 contributing profile items/channels by positive cosine
                 contributors: list[tuple[float, str, dict[str, str]]] = []
@@ -474,7 +475,7 @@ class RecommendationService:
                     for cos_val, _, item in contributors[:3]
                 ]
 
-                missing: list[str] = []
+                missing = profile_missing.copy()
                 if not cand_vec:
                     missing.append("text")
                 if not cand.category_id:
@@ -486,8 +487,9 @@ class RecommendationService:
                 if not cand.channel_id:
                     missing.append("channel_id")
 
-                low_confidence = not cand_vec or cand_lang is None or cand_lang != "en"
-                reason = format_reason(trace)
+                low_confidence = (
+                    not cand_vec or not profile_mean_vec or cand_lang != "en" or profile_uses_fallback
+                )
 
                 item = {
                     "item_id": cand.video_id,
@@ -501,14 +503,11 @@ class RecommendationService:
                     "duration_iso": cand.duration_iso,
                     "language": cand.language,
                     "published_at": cand.published_at.isoformat() if cand.published_at else None,
-                    "score": score,
-                    "reason": reason,
-                    "components": dict(RECOMMENDATION_WEIGHTS),
-                    "feature_trace": trace,
-                    "shared_terms": shared,
+                    **explain_score(
+                        raw, self.ctx.settings.scoring_weights["recommend_videos"],
+                        shared_terms=shared, missing_fields=missing, low_confidence=low_confidence,
+                    ),
                     "contributing_items": top_contributors,
-                    "missing_fields": sorted(missing),
-                    "low_confidence": low_confidence,
                     "untrusted_metadata": True,
                 }
                 ranked.append((item, cand.published_at))

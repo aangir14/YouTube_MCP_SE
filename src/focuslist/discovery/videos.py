@@ -4,14 +4,19 @@ from __future__ import annotations
 
 import math
 import unicodedata
-from collections import Counter
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from datetime import UTC, datetime
 from functools import partial
 from threading import Lock
 from typing import Any, TypeVar
 
 from focuslist.context import RequestContext
+from focuslist.discovery.scoring import (
+    build_tfidf_vectors,
+    cosine_and_shared_terms,
+    explain_score,
+    tokenize_text,
+)
 from focuslist.errors import (
     ChannelUnavailableError,
     FocusListError,
@@ -31,76 +36,15 @@ from focuslist.metadata import (
 )
 from focuslist.platform.gateway import ProviderGateway
 from focuslist.platform.provider import VideoProvider
+from focuslist.ranking_weights import VIDEO_WEIGHTS
 from focuslist.types import VideoRecord
 
 _PAGE = 50
 _CANDIDATE_CAP = 150
 _SEARCH_CAP = 2
 _GENERAL_CAP = 6
-_STOP_WORDS = frozenset(
-    {
-        "a",
-        "an",
-        "and",
-        "are",
-        "as",
-        "at",
-        "be",
-        "by",
-        "for",
-        "from",
-        "in",
-        "is",
-        "of",
-        "on",
-        "or",
-        "that",
-        "the",
-        "this",
-        "to",
-        "with",
-    }
-)
-VIDEO_WEIGHTS = {
-    "text_cosine": 0.50,
-    "tag_overlap": 0.15,
-    "category_match": 0.10,
-    "duration_fit": 0.10,
-    "language_match": 0.10,
-    "same_channel": 0.05,
-}
 _EARLIEST = datetime.min.replace(tzinfo=UTC)
 _T = TypeVar("_T")
-
-
-def _tokens(text: str, language: str | None) -> list[str]:
-    normalized = unicodedata.normalize("NFKC", text).casefold()
-    words = "".join(c if c.isalnum() else " " for c in normalized).split()
-    if primary_language(language) == "en":
-        return [word for word in words if word not in _STOP_WORDS]
-    return words
-
-
-def _vectors(records: Sequence[VideoRecord]) -> dict[str, dict[str, float]]:
-    documents = {
-        video.video_id: Counter(
-            _tokens(
-                " ".join([video.title, video.description or "", *(video.tags or [])]),
-                video.language,
-            )
-        )
-        for video in records
-    }
-    frequency = Counter(term for document in documents.values() for term in document)
-    vectors = {}
-    for video_id, document in documents.items():
-        weights = {
-            term: count * (math.log((1 + len(documents)) / (1 + frequency[term])) + 1)
-            for term, count in document.items()
-        }
-        norm = math.sqrt(math.fsum(value * value for value in weights.values()))
-        vectors[video_id] = {term: value / norm for term, value in weights.items()} if norm else {}
-    return vectors
 
 
 def _tag_set(tags: list[str] | None) -> set[str]:
@@ -135,11 +79,22 @@ def _video_fields(video: VideoRecord) -> dict[str, Any]:
     }
 
 
+def build_video_corpus(records: Sequence[VideoRecord]) -> dict[str, dict[str, float]]:
+    return build_tfidf_vectors({
+        video.video_id: (
+            " ".join([video.title, video.description or "", *(video.tags or ())]), video.language,
+        )
+        for video in records
+    })
+
+
 def rank_similar_videos(
-    seed: VideoRecord, candidates: Sequence[VideoRecord]
+    seed: VideoRecord, candidates: Sequence[VideoRecord],
+    *, weights: Mapping[str, float] = VIDEO_WEIGHTS,
+    corpus: Mapping[str, dict[str, float]] | None = None,
 ) -> list[dict[str, Any]]:
     """Score an eligible, deduplicated set using one fixed C08 corpus and no I/O."""
-    vectors = _vectors([seed, *candidates])
+    vectors = build_video_corpus([seed, *candidates]) if corpus is None else corpus
     seed_vector = vectors[seed.video_id]
     seed_facts = _pair_facts(seed, seed_vector)
     seed_tags = _tag_set(seed.tags)
@@ -147,17 +102,12 @@ def rank_similar_videos(
     for candidate in candidates:
         vector = vectors[candidate.video_id]
         facts = _pair_facts(candidate, vector)
-        products = {
-            term: weight * seed_vector[term]
-            for term, weight in vector.items()
-            if term in seed_vector
-        }
-        shared = sorted(products, key=lambda term: (-products[term], term))[:5]
+        text_cosine, shared = cosine_and_shared_terms(vector, seed_vector)
         tags = _tag_set(candidate.tags)
         tag_union = seed_tags | tags
         seed_duration, duration = seed.duration_seconds, candidate.duration_seconds
         raw = {
-            "text_cosine": min(1.0, math.fsum(products.values())),
+            "text_cosine": text_cosine,
             "tag_overlap": (
                 len(seed_tags & tags) / len(tag_union)
                 if seed_facts["tags"] and facts["tags"] and tag_union
@@ -178,11 +128,6 @@ def rank_similar_videos(
                 seed_facts["channel_id"] and seed.channel_id == candidate.channel_id
             ),
         }
-        trace = {
-            name: {"raw": raw[name], "weight": weight, "contribution": raw[name] * weight}
-            for name, weight in VIDEO_WEIGHTS.items()
-        }
-        score = round(math.fsum(factor["contribution"] for factor in trace.values()), 6)
         missing = sorted(
             [name for name, present in facts.items() if not present]
             + [f"seed.{name}" for name, present in seed_facts.items() if not present]
@@ -194,27 +139,11 @@ def rank_similar_videos(
             or primary_language(seed.language) != "en"
             or primary_language(candidate.language) != "en"
         )
-        positives = sorted(
-            (name for name in trace if trace[name]["contribution"] > 0),
-            key=lambda name: (-trace[name]["contribution"], name),
-        )
-        reason = (
-            "Strongest signals: "
-            + ", ".join(name.replace("_", " ") for name in positives[:3])
-            + "."
-            if positives
-            else "No positive similarity signals in the available metadata."
-        )
         item = {
             **_video_fields(candidate),
             "item_id": candidate.video_id,
-            "score": score,
-            "reason": reason,
-            "components": dict(VIDEO_WEIGHTS),
-            "feature_trace": trace,
-            "shared_terms": shared,
-            "missing_fields": missing,
-            "low_confidence": low_confidence,
+            **explain_score(raw, weights, shared_terms=shared, missing_fields=missing,
+                            low_confidence=low_confidence),
         }
         ranked.append((item, candidate.published_at))
 
@@ -239,7 +168,7 @@ def _eligible(video: VideoRecord) -> bool:
 def _search_queries(seed: VideoRecord) -> list[str]:
     queries = []
     for text in (seed.title, " ".join(seed.tags or []), seed.description or ""):
-        terms = list(dict.fromkeys(_tokens(text, seed.language)))[:6]
+        terms = list(dict.fromkeys(tokenize_text(text, seed.language)))[:6]
         query = " ".join(terms)[:160].strip()
         if query and query not in queries:
             queries.append(query)
@@ -402,7 +331,9 @@ class VideoDiscovery:
                         video = normalise_video_record(record)
                         if _eligible(video):
                             candidates[video.video_id] = video
-            results = rank_similar_videos(seed, list(candidates.values()))[:limit]
+            results = rank_similar_videos(
+                seed, list(candidates.values()), weights=self.ctx.settings.scoring_weights["similar_videos"],
+            )[:limit]
             if not results:
                 warnings.append("No eligible videos were found within the search bounds.")
             if any(item["missing_fields"] or item["low_confidence"] for item in results):
